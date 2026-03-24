@@ -37,7 +37,7 @@ jobs:
             echo "has_backend=false" >> "$GITHUB_OUTPUT"
           fi
 
-          if [ -f frontend/package.json ]; then
+          if [ -f frontend/package.json ] && [ -f frontend/package-lock.json ] && [ -f frontend/index.html ]; then
             echo "has_frontend=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_frontend=false" >> "$GITHUB_OUTPUT"
