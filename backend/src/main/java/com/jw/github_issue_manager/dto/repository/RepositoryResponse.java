@@ -2,23 +2,14 @@ package com.jw.github_issue_manager.dto.repository;
 
 import java.time.LocalDateTime;
 
-import com.jw.github_issue_manager.domain.RepositoryEntity;
-
 public record RepositoryResponse(
-    Long id,
+    Long githubRepositoryId,
+    String ownerLogin,
     String name,
+    String fullName,
     String description,
-    LocalDateTime createdAt,
-    LocalDateTime updatedAt
+    String htmlUrl,
+    boolean isPrivate,
+    LocalDateTime lastSyncedAt
 ) {
-
-    public static RepositoryResponse from(RepositoryEntity repositoryEntity) {
-        return new RepositoryResponse(
-            repositoryEntity.getId(),
-            repositoryEntity.getName(),
-            repositoryEntity.getDescription(),
-            repositoryEntity.getCreatedAt(),
-            repositoryEntity.getUpdatedAt()
-        );
-    }
 }
