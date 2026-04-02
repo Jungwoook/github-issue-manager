@@ -1,6 +1,18 @@
 import type { ApiErrorResponse } from '@/shared/types/api';
 
-const API_BASE_URL = '/api';
+const DEFAULT_API_BASE_URL = '/api';
+
+function normalizeBaseUrl(baseUrl?: string) {
+  const trimmed = baseUrl?.trim();
+
+  if (!trimmed) {
+    return DEFAULT_API_BASE_URL;
+  }
+
+  return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed;
+}
+
+const API_BASE_URL = normalizeBaseUrl(import.meta.env.VITE_API_BASE_URL);
 
 export class ApiError extends Error {
   status: number;
@@ -19,7 +31,8 @@ interface RequestOptions extends RequestInit {
 }
 
 function createUrl(path: string, query?: RequestOptions['query']) {
-  const url = new URL(`${API_BASE_URL}${path}`, window.location.origin);
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const url = new URL(`${API_BASE_URL}${normalizedPath}`, window.location.origin);
 
   if (query) {
     Object.entries(query as Record<string, unknown>).forEach(([key, value]) => {
@@ -43,6 +56,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const { query, headers, body, ...rest } = options;
   const response = await fetch(createUrl(path, query), {
     ...rest,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...headers,
