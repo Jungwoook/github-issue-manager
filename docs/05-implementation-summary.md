@@ -60,5 +60,6 @@
 - `02-architecture.md`
 - `03-api-spec.md`
 - `04-data-model.md`
-- `07-core-use-cases.md`
-- `14-current-improvement-checklist.md`
+- `06-core-use-cases.md`
+- `07-current-improvement-checklist.md`
+- `08-ngrok-https-setup.md`
