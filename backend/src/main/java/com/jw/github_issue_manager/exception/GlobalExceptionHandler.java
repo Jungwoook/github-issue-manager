@@ -10,58 +10,23 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.client.RestClientResponseException;
+
+import com.jw.github_issue_manager.github.GitHubApiException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(RepositoryNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleRepositoryNotFound(RepositoryNotFoundException exception) {
-        return conflictOrNotFound(HttpStatus.NOT_FOUND, "REPOSITORY_NOT_FOUND", exception.getMessage());
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            .body(ErrorResponse.of(exception.getCode(), exception.getMessage()));
     }
 
-    @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException exception) {
-        return conflictOrNotFound(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", exception.getMessage());
-    }
-
-    @ExceptionHandler(IssueNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleIssueNotFound(IssueNotFoundException exception) {
-        return conflictOrNotFound(HttpStatus.NOT_FOUND, "ISSUE_NOT_FOUND", exception.getMessage());
-    }
-
-    @ExceptionHandler(CommentNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleCommentNotFound(CommentNotFoundException exception) {
-        return conflictOrNotFound(HttpStatus.NOT_FOUND, "COMMENT_NOT_FOUND", exception.getMessage());
-    }
-
-    @ExceptionHandler(LabelNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleLabelNotFound(LabelNotFoundException exception) {
-        return conflictOrNotFound(HttpStatus.NOT_FOUND, "LABEL_NOT_FOUND", exception.getMessage());
-    }
-
-    @ExceptionHandler(DuplicateUserUsernameException.class)
-    public ResponseEntity<ErrorResponse> handleDuplicateUsername(DuplicateUserUsernameException exception) {
-        return conflictOrNotFound(HttpStatus.CONFLICT, "DUPLICATE_USER_USERNAME", exception.getMessage());
-    }
-
-    @ExceptionHandler(DuplicateUserEmailException.class)
-    public ResponseEntity<ErrorResponse> handleDuplicateEmail(DuplicateUserEmailException exception) {
-        return conflictOrNotFound(HttpStatus.CONFLICT, "DUPLICATE_USER_EMAIL", exception.getMessage());
-    }
-
-    @ExceptionHandler(UserDeleteConflictException.class)
-    public ResponseEntity<ErrorResponse> handleUserDeleteConflict(UserDeleteConflictException exception) {
-        return conflictOrNotFound(HttpStatus.CONFLICT, "USER_DELETE_CONFLICT", exception.getMessage());
-    }
-
-    @ExceptionHandler(DuplicateLabelNameException.class)
-    public ResponseEntity<ErrorResponse> handleDuplicateLabelName(DuplicateLabelNameException exception) {
-        return conflictOrNotFound(HttpStatus.CONFLICT, "DUPLICATE_LABEL_NAME", exception.getMessage());
-    }
-
-    @ExceptionHandler(LabelAlreadyAttachedException.class)
-    public ResponseEntity<ErrorResponse> handleLabelAlreadyAttached(LabelAlreadyAttachedException exception) {
-        return conflictOrNotFound(HttpStatus.CONFLICT, "LABEL_ALREADY_ATTACHED", exception.getMessage());
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ErrorResponse> handleUnauthorized(UnauthorizedException exception) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .body(ErrorResponse.of("UNAUTHORIZED", exception.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -82,8 +47,24 @@ public class GlobalExceptionHandler {
             .body(ErrorResponse.of("VALIDATION_ERROR", exception.getMessage()));
     }
 
-    private ResponseEntity<ErrorResponse> conflictOrNotFound(HttpStatus status, String code, String message) {
-        return ResponseEntity.status(status).body(ErrorResponse.of(code, message));
+    @ExceptionHandler(GitHubApiException.class)
+    public ResponseEntity<ErrorResponse> handleGitHubApi(GitHubApiException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+            .body(ErrorResponse.of("GITHUB_API_ERROR", exception.getMessage()));
+    }
+
+    @ExceptionHandler(RestClientResponseException.class)
+    public ResponseEntity<ErrorResponse> handleGitHubHttp(RestClientResponseException exception) {
+        HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());
+        HttpStatus responseStatus = status == null || status.is5xxServerError() ? HttpStatus.BAD_GATEWAY : status;
+        String message = exception.getResponseBodyAsString();
+
+        if (message == null || message.isBlank()) {
+            message = exception.getStatusText();
+        }
+
+        return ResponseEntity.status(responseStatus)
+            .body(ErrorResponse.of("GITHUB_API_ERROR", message));
     }
 
     private ErrorResponse.FieldErrorDetail toFieldErrorDetail(FieldError fieldError) {
