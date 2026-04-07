@@ -17,6 +17,7 @@ export function GitHubTokenForm() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [accessToken, setAccessToken] = useState('');
+  const [isTokenVisible, setIsTokenVisible] = useState(false);
 
   const tokenStatusQuery = useQuery({
     queryKey: queryKeys.githubTokenStatus,
@@ -28,6 +29,7 @@ export function GitHubTokenForm() {
     mutationFn: registerGitHubToken,
     onSuccess: async () => {
       setAccessToken('');
+      setIsTokenVisible(false);
 
       try {
         await refreshRepositories();
@@ -100,15 +102,29 @@ export function GitHubTokenForm() {
         >
           <div className="field">
             <label htmlFor="github-pat">Personal Access Token</label>
-            <input
-              id="github-pat"
-              type="text"
-              autoComplete="off"
-              value={accessToken}
-              disabled={isSubmitting}
-              placeholder="github_pat_..."
-              onChange={(event) => setAccessToken(event.target.value)}
-            />
+            <div className="password-field">
+              <input
+                id="github-pat"
+                type={isTokenVisible ? 'text' : 'password'}
+                autoComplete="new-password"
+                spellCheck={false}
+                value={accessToken}
+                disabled={isSubmitting}
+                placeholder="github_pat_..."
+                onChange={(event) => setAccessToken(event.target.value)}
+              />
+              <button
+                className="button button-ghost"
+                type="button"
+                disabled={isSubmitting}
+                aria-controls="github-pat"
+                aria-label={isTokenVisible ? 'Hide personal access token' : 'Show personal access token'}
+                aria-pressed={isTokenVisible}
+                onClick={() => setIsTokenVisible((current) => !current)}
+              >
+                {isTokenVisible ? '숨기기' : '보기'}
+              </button>
+            </div>
             <p className="field-help">
               최소 권한은 저장소 메타데이터 조회와 이슈 읽기/쓰기입니다. 개인 프로젝트 기준으로는 fine-grained PAT를 권장합니다.
             </p>
