@@ -2,9 +2,11 @@ package com.jw.github_issue_manager.service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.util.Base64;
 
 import javax.crypto.Cipher;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.springframework.stereotype.Service;
@@ -15,26 +17,60 @@ import com.jw.github_issue_manager.github.GitHubIntegrationProperties;
 @Service
 public class PatCryptoService {
 
+    private static final String ENCRYPTION_TRANSFORMATION = "AES/GCM/NoPadding";
+    private static final String KEY_ALGORITHM = "AES";
+    private static final int GCM_TAG_LENGTH_BITS = 128;
+    private static final int GCM_IV_LENGTH_BYTES = 12;
+    private static final String CIPHER_TEXT_VERSION = "v2";
+
     private final GitHubIntegrationProperties properties;
+    private final SecureRandom secureRandom = new SecureRandom();
 
     public PatCryptoService(GitHubIntegrationProperties properties) {
         this.properties = properties;
     }
 
     public String encrypt(String plainText) {
-        return Base64.getEncoder().encodeToString(runCipher(Cipher.ENCRYPT_MODE, plainText.getBytes(StandardCharsets.UTF_8)));
+        try {
+            byte[] iv = new byte[GCM_IV_LENGTH_BYTES];
+            secureRandom.nextBytes(iv);
+
+            Cipher cipher = Cipher.getInstance(ENCRYPTION_TRANSFORMATION);
+            cipher.init(
+                Cipher.ENCRYPT_MODE,
+                new SecretKeySpec(secretKey(), KEY_ALGORITHM),
+                new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv)
+            );
+
+            byte[] encrypted = cipher.doFinal(plainText.getBytes(StandardCharsets.UTF_8));
+            return CIPHER_TEXT_VERSION
+                + ":"
+                + Base64.getEncoder().encodeToString(iv)
+                + ":"
+                + Base64.getEncoder().encodeToString(encrypted);
+        } catch (Exception exception) {
+            throw new GitHubApiException("Failed to encrypt GitHub personal access token.", exception);
+        }
     }
 
     public String decrypt(String encryptedText) {
-        byte[] decoded = Base64.getDecoder().decode(encryptedText);
-        return new String(runCipher(Cipher.DECRYPT_MODE, decoded), StandardCharsets.UTF_8);
-    }
-
-    private byte[] runCipher(int mode, byte[] input) {
         try {
-            Cipher cipher = Cipher.getInstance("AES");
-            cipher.init(mode, new SecretKeySpec(secretKey(), "AES"));
-            return cipher.doFinal(input);
+            String[] parts = encryptedText.split(":");
+            if (parts.length != 3 || !CIPHER_TEXT_VERSION.equals(parts[0])) {
+                throw new GitHubApiException("Unsupported PAT cipher text format.");
+            }
+
+            byte[] iv = Base64.getDecoder().decode(parts[1]);
+            byte[] encrypted = Base64.getDecoder().decode(parts[2]);
+
+            Cipher cipher = Cipher.getInstance(ENCRYPTION_TRANSFORMATION);
+            cipher.init(
+                Cipher.DECRYPT_MODE,
+                new SecretKeySpec(secretKey(), KEY_ALGORITHM),
+                new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv)
+            );
+
+            return new String(cipher.doFinal(encrypted), StandardCharsets.UTF_8);
         } catch (Exception exception) {
             throw new GitHubApiException("Failed to process GitHub personal access token.", exception);
         }
@@ -47,10 +83,7 @@ public class PatCryptoService {
         }
 
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(rawKey.getBytes(StandardCharsets.UTF_8));
-            byte[] key = new byte[16];
-            System.arraycopy(digest, 0, key, 0, key.length);
-            return key;
+            return MessageDigest.getInstance("SHA-256").digest(rawKey.getBytes(StandardCharsets.UTF_8));
         } catch (Exception exception) {
             throw new GitHubApiException("Failed to initialize PAT encryption key.", exception);
         }
