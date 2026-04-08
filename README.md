@@ -38,3 +38,4 @@ GitHub Issue Manager는 사용자가 자신의 GitHub 저장소와 이슈를 간
 - [Core Use Cases](./docs/06-core-use-cases.md)
 - [Current Improvement Checklist](./docs/07-current-improvement-checklist.md)
 - [ngrok HTTPS Setup](./docs/08-ngrok-https-setup.md)
+- [Main Use Case Flow](./docs/11-main-use-case-flow.md)

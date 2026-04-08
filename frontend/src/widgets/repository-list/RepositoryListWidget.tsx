@@ -13,9 +13,12 @@ import { queryKeys } from '@/shared/constants/queryKeys';
 import { formatDate } from '@/shared/lib/formatDate';
 import { getErrorMessage } from '@/shared/lib/getErrorMessage';
 
+const PAGE_SIZE = 10;
+
 export function RepositoryListWidget() {
   const queryClient = useQueryClient();
   const [hasAutoRefreshed, setHasAutoRefreshed] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const tokenStatusQuery = useQuery({
     queryKey: queryKeys.githubTokenStatus,
@@ -32,6 +35,7 @@ export function RepositoryListWidget() {
     mutationFn: refreshRepositories,
     onSuccess: async () => {
       setHasAutoRefreshed(true);
+      setCurrentPage(1);
       await queryClient.invalidateQueries({ queryKey: queryKeys.repositories });
     },
   });
@@ -41,6 +45,9 @@ export function RepositoryListWidget() {
   const connectedOwners = new Set(repositories.map((repository) => repository.ownerLogin)).size;
   const privateRepositoryCount = repositories.filter((repository) => repository.private).length;
   const submitError = refreshMutation.error;
+  const totalPages = Math.max(1, Math.ceil(repositories.length / PAGE_SIZE));
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const visibleRepositories = repositories.slice(startIndex, startIndex + PAGE_SIZE);
 
   useEffect(() => {
     if (
@@ -61,11 +68,17 @@ export function RepositoryListWidget() {
     tokenConnected,
   ]);
 
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   return (
     <div className="page-stack">
       <section className="stats-grid">
         <article className="stat-card">
-          <p className="muted">조회된 저장소</p>
+          <p className="muted">조회한 저장소</p>
           <p className="stat-card-value">{repositories.length}</p>
         </article>
         <article className="stat-card">
@@ -112,47 +125,84 @@ export function RepositoryListWidget() {
 
         {repositories.length === 0 && tokenConnected && !repositoryQuery.isLoading && !refreshMutation.isPending ? (
           <div className="empty-state">
-            아직 불러온 저장소가 없습니다. PAT 권한을 확인한 뒤 `저장소 새로고침`을 눌러 GitHub 저장소를 가져오세요.
+            아직 불러온 저장소가 없습니다. PAT 권한을 확인하고 `저장소 새로고침`을 눌러 GitHub 저장소를 가져오세요.
           </div>
         ) : null}
 
-        <div className="card-grid compact">
-          {repositories.map((repository) => (
-            <RepositoryCard key={repository.githubRepositoryId} repository={repository} />
-          ))}
-        </div>
+        {visibleRepositories.length > 0 ? (
+          <>
+            <div className="repository-list">
+              {visibleRepositories.map((repository) => (
+                <RepositoryListItem key={repository.githubRepositoryId} repository={repository} />
+              ))}
+            </div>
+
+            <div className="pagination-bar">
+              <p className="muted">
+                {startIndex + 1}-{Math.min(startIndex + PAGE_SIZE, repositories.length)} / {repositories.length}
+              </p>
+              <div className="pagination-actions">
+                <button
+                  className="button button-ghost"
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                >
+                  이전
+                </button>
+                <span className="pagination-status">
+                  {currentPage} / {totalPages}
+                </span>
+                <button
+                  className="button button-ghost"
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                >
+                  다음
+                </button>
+              </div>
+            </div>
+          </>
+        ) : null}
       </section>
     </div>
   );
 }
 
-function RepositoryCard({ repository }: { repository: Repository }) {
+function RepositoryListItem({ repository }: { repository: Repository }) {
   return (
-    <article className="detail-card">
-      <div className="card-header">
-        <div className="stack-sm">
-          <Link className="issue-title-link" to={`/repositories/${repository.githubRepositoryId}/issues`}>
-            {repository.fullName}
-          </Link>
-          <span className="muted">동기화: {formatDate(repository.lastSyncedAt)}</span>
+    <article className="repository-list-item">
+      <div className="repository-list-main">
+        <div className="repository-list-header">
+          <div className="stack-sm">
+            <div className="repository-title-row">
+              <Link className="issue-title-link" to={`/repositories/${repository.githubRepositoryId}/issues`}>
+                {repository.fullName}
+              </Link>
+              <span className={`tag ${repository.private ? 'priority-high' : 'priority-low'}`}>
+                {repository.private ? '비공개' : '공개'}
+              </span>
+            </div>
+            <span className="muted">동기화: {formatDate(repository.lastSyncedAt)}</span>
+          </div>
+
+          <div className="repository-actions">
+            <Link className="button" to={`/repositories/${repository.githubRepositoryId}/issues`}>
+              이슈보기
+            </Link>
+            <a
+              className="button button-ghost"
+              href={repository.htmlUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              GitHub 열기
+            </a>
+          </div>
         </div>
-        <span className={`tag ${repository.private ? 'priority-high' : 'priority-low'}`}>
-          {repository.private ? '비공개' : '공개'}
-        </span>
-      </div>
-      <p className="muted">{repository.description?.trim() || '설명이 없습니다.'}</p>
-      <div className="toolbar">
-        <Link className="button" to={`/repositories/${repository.githubRepositoryId}/issues`}>
-          이슈 보기
-        </Link>
-        <a
-          className="button button-ghost"
-          href={repository.htmlUrl}
-          target="_blank"
-          rel="noreferrer"
-        >
-          GitHub 열기
-        </a>
+
+        <p className="muted repository-description">{repository.description?.trim() || '설명이 없습니다.'}</p>
       </div>
     </article>
   );
