@@ -72,7 +72,80 @@ flowchart TD
     AL --> AM["comment_caches 반영"]
 ```
 
-## 5. 단계별 상세 흐름
+## 5. 전체 Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant F as Frontend
+    participant A as AuthController/AuthService
+    participant R as RepositoryService
+    participant I as IssueService
+    participant C as CommentService
+    participant DB as Cache/DB
+    participant GH as GitHub API
+
+    U->>F: PAT 입력 및 등록
+    F->>A: POST /api/github/token
+    A->>GH: GET /user
+    GH-->>A: GitHub 사용자 정보
+    A->>DB: github_accounts 저장, 세션 연결
+    A-->>F: 로그인 사용자 응답
+
+    F->>R: POST /api/repositories/refresh
+    R->>DB: 세션 사용자 조회
+    R->>GH: GET /user/repos
+    GH-->>R: 접근 가능한 저장소 목록
+    R->>DB: repository_caches upsert
+    R-->>F: 저장소 목록 반환
+
+    U->>F: 저장소 선택
+    F->>I: POST /api/repositories/{repositoryId}/issues/refresh
+    I->>DB: 저장소 접근 권한 확인
+    I->>GH: GET /repos/{owner}/{repo}/issues
+    GH-->>I: 이슈 목록
+    I->>DB: issue_caches upsert
+    I-->>F: 이슈 목록 반환
+
+    U->>F: 이슈 상세 진입
+    F->>I: GET /api/repositories/{repositoryId}/issues/{issueNumber}
+    I->>DB: issue_caches 조회
+    I-->>F: 이슈 상세 반환
+
+    F->>C: GET /api/repositories/{repositoryId}/issues/{issueNumber}/comments
+    C->>DB: comment_caches 조회
+    C-->>F: 댓글 목록 반환
+
+    U->>F: 새 이슈 생성
+    F->>I: POST /api/repositories/{repositoryId}/issues
+    I->>GH: POST /repos/{owner}/{repo}/issues
+    GH-->>I: 생성된 이슈
+    I->>DB: issue_caches 반영
+    I-->>F: 생성된 이슈 상세 반환
+
+    U->>F: 이슈 상태 변경 또는 닫기
+    F->>I: PATCH or DELETE /issues/{issueNumber}
+    I->>GH: PATCH /repos/{owner}/{repo}/issues/{issueNumber}
+    GH-->>I: 수정된 이슈
+    I->>DB: issue_caches 갱신
+    I-->>F: 변경 결과 반환
+
+    U->>F: 댓글 새로고침
+    F->>C: POST /comments/refresh
+    C->>GH: GET /repos/{owner}/{repo}/issues/{issueNumber}/comments
+    GH-->>C: 최신 댓글 목록
+    C->>DB: comment_caches upsert
+    C-->>F: 댓글 목록 반환
+
+    U->>F: 댓글 작성
+    F->>C: POST /comments
+    C->>GH: POST /repos/{owner}/{repo}/issues/{issueNumber}/comments
+    GH-->>C: 생성된 댓글
+    C->>DB: comment_caches 반영
+    C-->>F: 생성된 댓글 반환
+```
+
+## 6. 단계별 상세 흐름
 
 ### 5.1 PAT 등록과 세션 연결
 
@@ -114,7 +187,7 @@ PAT 등록이 성공하면 프론트는 즉시 `refreshRepositories()`를 호출
 
 댓글 작성은 `POST /api/repositories/{repositoryId}/issues/{issueNumber}/comments`로 들어간다. `CommentService.createComment(...)`가 GitHub 댓글 생성 API를 호출하고, 생성된 댓글을 `comment_caches`에 반영한다.
 
-## 6. 이 흐름의 핵심 설계 포인트
+## 7. 이 흐름의 핵심 설계 포인트
 
 - 인증의 기준은 세션이다. PAT는 최초 등록 시점에만 프론트에서 전달된다.
 - 조회의 기준은 캐시다. 저장소, 이슈, 댓글 조회 API는 기본적으로 로컬 캐시를 반환한다.
@@ -122,7 +195,7 @@ PAT 등록이 성공하면 프론트는 즉시 `refreshRepositories()`를 호출
 - 쓰기의 기준은 GitHub 원본이다. 이슈 생성, 수정, 댓글 생성은 먼저 GitHub에 반영한 뒤 캐시에 반영한다.
 - 접근 제어의 기준은 현재 로그인 사용자다. 백엔드는 세션 사용자와 저장소 owner 정보를 대조해 접근 가능한 리소스만 노출한다.
 
-## 7. 코드 추적 포인트
+## 8. 코드 추적 포인트
 
 ### 프론트엔드
 
@@ -147,7 +220,7 @@ PAT 등록이 성공하면 프론트는 즉시 `refreshRepositories()`를 호출
 - 댓글 서비스: `backend/src/main/java/com/jw/github_issue_manager/service/CommentService.java`
 - GitHub API 클라이언트: `backend/src/main/java/com/jw/github_issue_manager/github/DefaultGitHubApiClient.java`
 
-## 8. 대표 API 시퀀스
+## 9. 대표 API 시퀀스
 
 메인 유스케이스를 가장 짧게 따라가면 아래 호출 순서가 된다.
 
@@ -164,7 +237,7 @@ PAT 등록이 성공하면 프론트는 즉시 `refreshRepositories()`를 호출
 11. `PATCH /api/repositories/{repositoryId}/issues/{issueNumber}`
 12. `DELETE /api/github/token`
 
-## 9. 테스트 기준의 검증 포인트
+## 10. 테스트 기준의 검증 포인트
 
 현재 이 전체 흐름은 `backend/src/test/java/com/jw/github_issue_manager/controller/ApiFlowIntegrationTest.java`에 통합 시나리오 형태로 정리되어 있다.
 
@@ -184,7 +257,7 @@ PAT 등록이 성공하면 프론트는 즉시 `refreshRepositories()`를 호출
 - 이슈 sync-state 조회
 - 토큰 연결 해제
 
-## 10. 정리
+## 11. 정리
 
 현재 GitHub Issue Manager의 메인 유스케이스는 "PAT 기반 GitHub 연동 + 캐시 기반 조회 + 필요 시 GitHub 재동기화" 구조로 이해하면 가장 정확하다.
 
