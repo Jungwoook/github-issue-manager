@@ -25,7 +25,7 @@ GitHub Issue Manager는 사용자가 자신의 GitHub 저장소와 이슈를 간
 
 - `backend/`: Spring Boot 백엔드
 - `frontend/`: React + Vite 프론트엔드
-- Frontend URL: https://github-issue-manager-beta.vercel.app/repositories
+- Frontend URL: [https://github-issue-manager-beta.vercel.app/](https://github-issue-manager-beta.vercel.app/)
 - `docs/`: 요구사항, 아키텍처, API, 데이터 모델, 유스케이스 문서
 
 ## 주요 문서
