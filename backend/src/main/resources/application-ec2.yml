@@ -1,12 +1,12 @@
 spring:
-  application:
-    name: github-issue-manager
+  config:
+    activate:
+      on-profile: ec2
 
 app:
   cors:
     allowed-origins:
-      - http://localhost:5173
       - https://github-issue-manager-bxezsmg8d-okjungwoo-4903s-projects.vercel.app
   github:
     api-base-url: ${GITHUB_API_BASE_URL:https://api.github.com}
-    pat-encryption-key: ${GITHUB_PAT_ENCRYPTION_KEY:local-dev-pat-key}
+    pat-encryption-key: ${GITHUB_PAT_ENCRYPTION_KEY}
