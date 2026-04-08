@@ -6,7 +6,6 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
-@ConfigurationProperties(prefix = "app.cors")
 public class WebCorsConfig implements WebMvcConfigurer {
 
     private String[] allowedOrigins = new String[] { "http://localhost:5173" };
