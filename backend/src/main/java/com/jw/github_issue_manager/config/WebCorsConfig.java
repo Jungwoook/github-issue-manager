@@ -1,20 +1,22 @@
 package com.jw.github_issue_manager.config;
 
-import java.util.List;
+import java.util.Arrays;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
-@ConfigurationProperties(prefix = "app.cors")
 public class WebCorsConfig implements WebMvcConfigurer {
 
-    private List<String> allowedOrigins = List.of("http://localhost:5173");
+    private final String[] allowedOrigins;
 
-    public void setAllowedOrigins(List<String> allowedOrigins) {
-        this.allowedOrigins = allowedOrigins;
+    public WebCorsConfig(@Value("${app.cors.allowed-origins:http://localhost:5173}") String allowedOrigins) {
+        this.allowedOrigins = Arrays.stream(allowedOrigins.split(","))
+            .map(String::trim)
+            .filter(value -> !value.isBlank())
+            .toArray(String[]::new);
     }
 
     @Override
