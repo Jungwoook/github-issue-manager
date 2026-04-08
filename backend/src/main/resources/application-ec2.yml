@@ -6,7 +6,7 @@ spring:
 app:
   cors:
     allowed-origins:
-      - https://github-issue-manager-bxezsmg8d-okjungwoo-4903s-projects.vercel.app
+      - https://github-issue-manager-*.vercel.app
   github:
     api-base-url: ${GITHUB_API_BASE_URL:https://api.github.com}
     pat-encryption-key: ${GITHUB_PAT_ENCRYPTION_KEY}

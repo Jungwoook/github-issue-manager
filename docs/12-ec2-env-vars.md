@@ -19,16 +19,16 @@ java -jar app.jar --spring.profiles.active=ec2
 - 예시:
 
 ```bash
-APP_CORS_ALLOWED_ORIGINS=*
+APP_CORS_ALLOWED_ORIGINS=https://github-issue-manager-*.vercel.app
 ```
 
 여러 Origin을 허용해야 하면 쉼표로 구분해 전달하면 된다.
 
 ```bash
-APP_CORS_ALLOWED_ORIGINS=https://github-issue-manager-beta.vercel.app,https://admin.example.com
+APP_CORS_ALLOWED_ORIGINS=https://github-issue-manager-*.vercel.app,https://admin.example.com
 ```
 
-전체 허용이 필요하면 `*`를 사용할 수 있다. 현재 프로젝트는 `allowCredentials(true)`를 사용하므로, 이를 지원하기 위해 CORS 설정은 `allowedOriginPatterns` 기준으로 동작하도록 맞춰져 있어야 한다.
+현재 프로젝트는 `allowCredentials(true)`를 사용하므로, 프로젝트 코드도 `allowedOriginPatterns` 기준으로 동작해야 한다. 이 설정이면 Vercel의 배포 URL이 바뀌어도 `github-issue-manager-` 접두사를 가진 프로젝트 배포 주소는 계속 허용할 수 있다.
 
 ### `GITHUB_PAT_ENCRYPTION_KEY`
 
@@ -64,7 +64,7 @@ GITHUB_API_BASE_URL=https://api.github.com
 ## 4. 권장 EC2 환경변수 예시
 
 ```bash
-export APP_CORS_ALLOWED_ORIGINS=*
+export APP_CORS_ALLOWED_ORIGINS=https://github-issue-manager-*.vercel.app
 export GITHUB_PAT_ENCRYPTION_KEY=change-this-to-a-long-random-production-secret
 export GITHUB_API_BASE_URL=https://api.github.com
 ```

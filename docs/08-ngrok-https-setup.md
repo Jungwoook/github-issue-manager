@@ -106,7 +106,7 @@ sudo vi /etc/github-issue-manager.env
 예시:
 
 ```env
-APP_CORS_ALLOWED_ORIGINS=https://github-issue-manager-f0h23adqb-okjungwoo-4903s-projects.vercel.app
+APP_CORS_ALLOWED_ORIGINS=https://github-issue-manager-*.vercel.app
 GITHUB_PAT_ENCRYPTION_KEY=운영용_충분히_긴_랜덤_문자열
 GITHUB_API_BASE_URL=https://api.github.com
 ```
