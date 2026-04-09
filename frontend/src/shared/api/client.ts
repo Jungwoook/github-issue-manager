@@ -56,7 +56,6 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const { query, headers, body, ...rest } = options;
   const response = await fetch(createUrl(path, query), {
     ...rest,
-    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...headers,
