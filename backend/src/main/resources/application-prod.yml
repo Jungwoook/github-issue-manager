@@ -1,0 +1,12 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+app:
+  cors:
+    allowed-origins:
+      - https://github-issue-manager-beta.vercel.app
+  github:
+    api-base-url: ${GITHUB_API_BASE_URL:https://api.github.com}
+    pat-encryption-key: ${GITHUB_PAT_ENCRYPTION_KEY}
