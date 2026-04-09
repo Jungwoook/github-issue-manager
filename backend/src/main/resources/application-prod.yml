@@ -3,6 +3,13 @@ spring:
     activate:
       on-profile: prod
 
+server:
+  servlet:
+    session:
+      cookie:
+        same-site: none
+        secure: true
+
 app:
   cors:
     allowed-origins:

@@ -12,11 +12,19 @@ EC2 서비스가 `--spring.config.location=file:/home/ec2-user/app/config/applic
 
 - 리포에 `backend/src/main/resources/application-prod.yml` 추가
 - `prod` 프로필에서 사용할 CORS 허용 Origin을 내부 설정으로 관리
+- Vercel 프론트와 HTTPS 백엔드 간 세션 유지를 위해 쿠키 속성 설정 추가
 - GitHub API 기본 주소와 PAT 암호화 키는 계속 환경변수로 주입
 
 ## prod 설정 값
 
 ```yaml
+server:
+  servlet:
+    session:
+      cookie:
+        same-site: none
+        secure: true
+
 app:
   cors:
     allowed-origins:
@@ -45,4 +53,5 @@ EC2에서는 외부 `application-prod.yml` 대신 jar 내부 `application-prod.y
 
 - 코드와 prod 설정을 같은 PR 범위에서 함께 검토할 수 있다.
 - EC2에서 실제로 어떤 CORS 설정이 적용되는지 추적하기 쉬워진다.
+- 교차 출처 요청에서도 세션 쿠키가 유지되어 후속 API 호출이 401로 끊기지 않도록 돕는다.
 - 외부 설정 파일과 리포 설정 파일의 불일치로 생기는 배포 혼선을 줄일 수 있다.
