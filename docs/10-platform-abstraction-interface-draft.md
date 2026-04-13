@@ -6,7 +6,7 @@
 - 1차 범위: 백엔드에서 `PlatformGateway`, `PlatformType`, `Remote*` DTO 같은 공통 인터페이스를 먼저 도입한다.
 - 원칙: 기존 GitHub 기능은 유지하고, 서비스 레이어가 GitHub 구현체 대신 공통 포트에 의존하도록 바꾼다.
 - 데이터 모델: `githubRepositoryId`, `githubIssueId`, `GitHubAccount` 같은 GitHub 전용 식별자를 장기적으로 `platform + externalId` 구조로 일반화한다.
-- 프론트 방향: 프론트는 이번 단계에서 부분 수정하지 않고, 백엔드 공통 모듈 분리 리팩토링이 모두 완료된 이후 한 번에 정리한다.
+- 프론트 방향: 프론트는 이번 단계에서 부분 수정하지 않고, 백엔드 공통 모듈 분리 리팩토링이 모두 완료된 이후 별도 작업으로 진행한다.
 
 ## 1. 개요
 
@@ -18,8 +18,6 @@
 - 프론트 설정 화면도 `GitHubTokenPage`, `githubTokenApi`처럼 GitHub 전용 명칭을 사용한다.
 
 다른 플랫폼을 추가하려면 GitHub 구현을 제거하는 것이 아니라, GitHub를 첫 번째 플랫폼 어댑터로 재배치해야 한다.
-
-이 문서는 현재 코드 기준으로 공통 모듈 분리를 위한 인터페이스 초안을 정리한다.
 
 ## 2. 목표
 
@@ -99,9 +97,6 @@ public record ExternalResourceRef(
 
 - `externalId`: 플랫폼 고유 ID
 - `externalKey`: 사용자가 식별하는 번호나 키
-- GitHub의 경우 예시
-  - repository: `externalId = "123456789"`, `externalKey = "owner/repo"`
-  - issue: `externalId = "987654321"`, `externalKey = "123"`
 
 ### 5.3 원격 사용자 프로필
 
@@ -171,8 +166,6 @@ public record RemoteComment(
 
 ## 6. 플랫폼 게이트웨이 인터페이스 초안
 
-현재 `GitHubApiClient`는 이미 좋은 시작점이다. 다만 이름과 DTO를 공통화해서 서비스 레이어에서 재사용 가능하도록 바꾸는 것이 핵심이다.
-
 ```java
 public interface PlatformGateway {
 
@@ -225,8 +218,6 @@ public interface PlatformGateway {
 
 초기 버전에서는 메서드 파라미터를 현재 GitHub 구조에 맞춰 `ownerKey`, `repositoryName`, `issueKey` 형태로 유지하는 것이 현실적이다.
 
-완전한 일반화는 가능하지만, 1차 리팩토링에서는 현재 서비스 로직을 최대한 적게 깨는 쪽이 좋다.
-
 ## 7. 플랫폼 선택 인터페이스 초안
 
 ```java
@@ -236,15 +227,9 @@ public interface PlatformGatewayResolver {
 }
 ```
 
-예상 구현 방식:
-
-- Spring Bean 목록을 주입받아 `PlatformType` 기준으로 매핑
-- 현재는 `GITHUB -> GithubPlatformGateway` 하나만 등록
+현재는 `GITHUB -> GithubPlatformGateway` 하나만 있어도 충분하다.
 
 ## 8. 연결 관리 인터페이스 초안
-
-현재 `AuthService`는 GitHub 인증과 세션 처리를 동시에 담당한다.
-이를 분리하면 GitHub 외 플랫폼도 같은 흐름에 태울 수 있다.
 
 ```java
 public interface PlatformConnectionService {
@@ -278,8 +263,6 @@ public class PlatformConnection {
 }
 ```
 
-현재 `GitHubAccount`는 이 구조로 승격할 수 있다.
-
 ## 9. 현재 클래스와 목표 인터페이스 매핑
 
 ### 9.1 인증
@@ -311,44 +294,18 @@ public class PlatformConnection {
 
 ### 10.1 RepositoryCache
 
-현재:
-
-- `githubRepositoryId`
-- `ownerLogin`
-
-제안:
-
-- `platform`
-- `externalId`
-- `ownerKey`
+- 현재: `githubRepositoryId`, `ownerLogin`
+- 제안: `platform`, `externalId`, `ownerKey`
 
 ### 10.2 IssueCache
 
-현재:
-
-- `githubIssueId`
-- `githubRepositoryId`
-- `number`
-
-제안:
-
-- `platform`
-- `externalId`
-- `repositoryExternalId`
-- `numberOrKey`
+- 현재: `githubIssueId`, `githubRepositoryId`, `number`
+- 제안: `platform`, `externalId`, `repositoryExternalId`, `numberOrKey`
 
 ### 10.3 GitHubAccount
 
-현재:
-
-- `githubUserId`
-- `login`
-
-제안:
-
-- `platform`
-- `externalUserId`
-- `accountLogin`
+- 현재: `githubUserId`, `login`
+- 제안: `platform`, `externalUserId`, `accountLogin`
 
 ## 11. 서비스 레이어 적용 방식
 
@@ -386,73 +343,15 @@ List<RemoteIssue> issues = gateway.getRepositoryIssues(
 - `widgets/github-token/*`
 - `queryKeys.githubTokenStatus`
 
-프론트는 이번 공통 모듈 분리 1차 작업에서 함께 뜯지 않는다.
+프론트는 이번 공통 모듈 분리 단계에서 함께 수정하지 않는다.
 
-- 백엔드 공통 인터페이스와 데이터 모델 분리가 먼저 끝난 뒤 수정한다.
-- 중간 단계에서 프론트까지 같이 건드리면 API 명세, 쿼리 키, 화면 네이밍이 반복 변경될 가능성이 크다.
-- 따라서 프론트는 백엔드 구조가 안정화된 이후 한 번에 리팩토링하는 것을 원칙으로 한다.
-
-백엔드 구조 확정 후 제안하는 프론트 목표 구조는 아래와 같다.
-
-```text
-frontend/src
-  entities
-    platform-connection
-      api
-      model
-  pages
-    settings
-      PlatformConnectionsPage.tsx
-  widgets
-    platform-connection
-      PlatformConnectionCard.tsx
-      PlatformConnectionForm.tsx
-```
-
-예상 전환 대상:
-
-- `entities/github/api/githubTokenApi.ts` -> `entities/platform-connection/api/*`
-- `pages/settings/GitHubTokenPage.tsx` -> `pages/settings/PlatformConnectionsPage.tsx`
-- `widgets/github-token/*` -> `widgets/platform-connection/*`
-- `queryKeys.githubTokenStatus` -> 플랫폼별 연결 상태 키
-
-이 리팩토링은 백엔드 공통화 완료 후 일괄 적용한다.
-
-### 프론트 API 초안
-
-백엔드 공통화가 끝난 뒤, 프론트는 아래 형태의 공통 연결 API를 기준으로 맞춘다.
-
-```text
-후보 API
-- GET /platform-connections/{platform}/status
-- POST /platform-connections/{platform}
-- DELETE /platform-connections/{platform}
-```
-
-```ts
-export function getPlatformConnectionStatus(platform: string) {
-  return apiRequest(`/platform-connections/${platform}/status`);
-}
-
-export function connectPlatform(platform: string, payload: { accessToken: string }) {
-  return apiRequest(`/platform-connections/${platform}`, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-}
-
-export function disconnectPlatform(platform: string) {
-  return apiRequest(`/platform-connections/${platform}`, {
-    method: 'DELETE',
-  });
-}
-```
-
-초기 프론트 개편 시점에도 첫 화면에는 GitHub만 노출할 수 있다. 다만 내부 구조는 다중 플랫폼 확장을 수용하도록 맞춘다.
+- 백엔드 공통 인터페이스와 데이터 모델 분리가 먼저 끝나야 한다.
+- 중간 단계에서 프론트까지 같이 건드리면 API 명세와 화면 구조가 반복 변경될 가능성이 크다.
+- 따라서 프론트는 백엔드 구조가 안정화된 이후 별도 작업으로 진행한다.
 
 ## 13. 1차 리팩토링 범위
 
-1차에서는 아래까지만 해도 충분하다.
+1차에서는 백엔드 서비스 레이어의 의존성 분리까지 진행한다.
 
 1. `PlatformType`, `Remote*` DTO, `PlatformGateway` 도입
 2. `GitHubApiClient` 구현을 `PlatformGateway` 구현체로 감싸기
@@ -463,24 +362,35 @@ export function disconnectPlatform(platform: string) {
 
 ## 14. 2차 리팩토링 범위
 
-2차에서는 데이터 모델까지 일반화한다.
+2차에서는 백엔드 데이터 모델까지 일반화한다.
 
 1. `GitHubAccount` -> `PlatformConnection`
 2. `githubRepositoryId` -> `externalId`
 3. `githubIssueId` -> `externalId`
 4. 캐시 엔티티에 `platform` 필드 추가
 5. 리포지토리 메서드를 `findByPlatformAndExternalId` 형태로 전환
-6. 프론트 설정 화면과 API 모듈을 공통 플랫폼 연결 구조로 일괄 변경
 
 이 단계부터는 마이그레이션 스크립트와 API 응답 필드명 정리가 필요하다.
+프론트는 여전히 범위에 포함하지 않는다.
 
-## 15. 현재 코드 기준 추천 시작점
+## 15. 프론트 후속 리팩토링 단계
+
+프론트는 백엔드 구조 정리가 끝난 뒤 별도 작업으로 진행한다.
+
+1. 설정 화면을 공통 플랫폼 연결 구조로 전환
+2. GitHub 전용 API 모듈을 플랫폼 연결 모듈로 재구성
+3. 쿼리 키, 라우트, 화면 네이밍을 공통 구조로 일괄 정리
+
+즉, 프론트 리팩토링은 2차 백엔드 리팩토링 완료 후 후속 단계로 분리한다.
+
+## 16. 현재 코드 기준 추천 시작점
 
 현재 코드 기준으로 가장 좋은 시작점은 아래 순서다.
 
 1. `GitHubApiClient`를 대체하지 말고, 그 앞에 `PlatformGateway` 인터페이스를 추가한다.
 2. `GitHubIssueInfo`, `GitHubRepositoryInfo`, `GitHubCommentInfo`, `GitHubUserProfile`를 `Remote*` DTO로 변환하는 매퍼를 만든다.
 3. `RepositoryService`, `IssueService`, `AuthService`의 의존성을 GitHub 타입에서 공통 포트로 바꾼다.
-4. 구조가 안정화되면 엔티티와 API 이름을 일반화한다.
+4. 구조가 안정화되면 백엔드 엔티티와 API 이름을 일반화한다.
+5. 백엔드 구조 정리가 끝난 뒤 프론트 공통화 작업을 별도 단계로 진행한다.
 
 이 순서로 가면 GitHub 기능을 유지하면서도 다중 플랫폼 확장을 위한 기반을 가장 낮은 리스크로 만들 수 있다.
