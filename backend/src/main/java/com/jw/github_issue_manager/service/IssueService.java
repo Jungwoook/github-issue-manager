@@ -1,11 +1,13 @@
 package com.jw.github_issue_manager.service;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.jw.github_issue_manager.core.platform.PlatformGatewayResolver;
+import com.jw.github_issue_manager.core.platform.PlatformType;
+import com.jw.github_issue_manager.core.remote.RemoteIssue;
 import com.jw.github_issue_manager.domain.IssueCache;
 import com.jw.github_issue_manager.domain.RepositoryCache;
 import com.jw.github_issue_manager.domain.SyncResourceType;
@@ -15,8 +17,6 @@ import com.jw.github_issue_manager.dto.issue.IssueSummaryResponse;
 import com.jw.github_issue_manager.dto.issue.UpdateIssueRequest;
 import com.jw.github_issue_manager.dto.sync.SyncStateResponse;
 import com.jw.github_issue_manager.exception.ResourceNotFoundException;
-import com.jw.github_issue_manager.github.GitHubApiClient;
-import com.jw.github_issue_manager.github.GitHubIssueInfo;
 import com.jw.github_issue_manager.repository.IssueCacheRepository;
 
 import jakarta.servlet.http.HttpSession;
@@ -28,20 +28,20 @@ public class IssueService {
     private final RepositoryService repositoryService;
     private final SyncStateService syncStateService;
     private final AuthService authService;
-    private final GitHubApiClient gitHubApiClient;
+    private final PlatformGatewayResolver platformGatewayResolver;
 
     public IssueService(
         IssueCacheRepository issueCacheRepository,
         RepositoryService repositoryService,
         SyncStateService syncStateService,
         AuthService authService,
-        GitHubApiClient gitHubApiClient
+        PlatformGatewayResolver platformGatewayResolver
     ) {
         this.issueCacheRepository = issueCacheRepository;
         this.repositoryService = repositoryService;
         this.syncStateService = syncStateService;
         this.authService = authService;
-        this.gitHubApiClient = gitHubApiClient;
+        this.platformGatewayResolver = platformGatewayResolver;
     }
 
     @Transactional(readOnly = true)
@@ -59,7 +59,7 @@ public class IssueService {
     public List<IssueSummaryResponse> refreshIssues(Long githubRepositoryId, HttpSession session) {
         RepositoryCache repository = repositoryService.requireAccessibleRepository(githubRepositoryId, session);
         String personalAccessToken = authService.requirePersonalAccessToken(session);
-        List<GitHubIssueInfo> issues = gitHubApiClient.getRepositoryIssues(
+        List<RemoteIssue> issues = platformGatewayResolver.getGateway(PlatformType.GITHUB).getRepositoryIssues(
             personalAccessToken,
             repository.getOwnerLogin(),
             repository.getName()
@@ -79,7 +79,7 @@ public class IssueService {
     public IssueDetailResponse createIssue(Long githubRepositoryId, CreateIssueRequest request, HttpSession session) {
         RepositoryCache repository = repositoryService.requireAccessibleRepository(githubRepositoryId, session);
         String personalAccessToken = authService.requirePersonalAccessToken(session);
-        GitHubIssueInfo createdIssue = gitHubApiClient.createIssue(
+        RemoteIssue createdIssue = platformGatewayResolver.getGateway(PlatformType.GITHUB).createIssue(
             personalAccessToken,
             repository.getOwnerLogin(),
             repository.getName(),
@@ -108,11 +108,11 @@ public class IssueService {
         IssueCache currentIssue = requireIssue(githubRepositoryId, issueNumber, session);
         String personalAccessToken = authService.requirePersonalAccessToken(session);
 
-        GitHubIssueInfo updatedIssue = gitHubApiClient.updateIssue(
+        RemoteIssue updatedIssue = platformGatewayResolver.getGateway(PlatformType.GITHUB).updateIssue(
             personalAccessToken,
             repository.getOwnerLogin(),
             repository.getName(),
-            issueNumber,
+            issueNumber.toString(),
             request.title() != null ? request.title() : currentIssue.getTitle(),
             request.body() != null ? request.body() : currentIssue.getBody(),
             normalizeState(request.state(), currentIssue.getState())
@@ -132,11 +132,11 @@ public class IssueService {
     public void deleteIssue(Long githubRepositoryId, Integer issueNumber, HttpSession session) {
         RepositoryCache repository = repositoryService.requireAccessibleRepository(githubRepositoryId, session);
         String personalAccessToken = authService.requirePersonalAccessToken(session);
-        gitHubApiClient.updateIssue(
+        platformGatewayResolver.getGateway(PlatformType.GITHUB).updateIssue(
             personalAccessToken,
             repository.getOwnerLogin(),
             repository.getName(),
-            issueNumber,
+            issueNumber.toString(),
             null,
             null,
             "CLOSED"
@@ -162,16 +162,18 @@ public class IssueService {
             .orElseThrow(() -> new ResourceNotFoundException("ISSUE_NOT_FOUND", "Issue was not found."));
     }
 
-    private IssueCache upsertIssue(RepositoryCache repository, GitHubIssueInfo issueInfo) {
-        return issueCacheRepository.findByGithubRepositoryIdAndNumber(repository.getGithubRepositoryId(), issueInfo.number())
+    private IssueCache upsertIssue(RepositoryCache repository, RemoteIssue issueInfo) {
+        int issueNumber = Integer.parseInt(issueInfo.numberOrKey());
+        long githubIssueId = Long.parseLong(issueInfo.externalId());
+        return issueCacheRepository.findByGithubRepositoryIdAndNumber(repository.getGithubRepositoryId(), issueNumber)
             .map(existing -> {
                 existing.update(issueInfo.title(), issueInfo.body(), normalizeState(issueInfo.state(), existing.getState()), issueInfo.updatedAt());
                 return existing;
             })
             .orElseGet(() -> issueCacheRepository.save(new IssueCache(
-                issueInfo.id(),
+                githubIssueId,
                 repository.getGithubRepositoryId(),
-                issueInfo.number(),
+                issueNumber,
                 issueInfo.title(),
                 issueInfo.body(),
                 normalizeState(issueInfo.state(), "OPEN"),

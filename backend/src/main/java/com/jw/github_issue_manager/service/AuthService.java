@@ -5,6 +5,9 @@ import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.jw.github_issue_manager.core.platform.PlatformGatewayResolver;
+import com.jw.github_issue_manager.core.platform.PlatformType;
+import com.jw.github_issue_manager.core.remote.RemoteUserProfile;
 import com.jw.github_issue_manager.domain.GitHubAccount;
 import com.jw.github_issue_manager.domain.User;
 import com.jw.github_issue_manager.dto.auth.GitHubAccountResponse;
@@ -12,8 +15,6 @@ import com.jw.github_issue_manager.dto.auth.GitHubTokenStatusResponse;
 import com.jw.github_issue_manager.dto.auth.MeResponse;
 import com.jw.github_issue_manager.dto.auth.RegisterGitHubTokenRequest;
 import com.jw.github_issue_manager.exception.UnauthorizedException;
-import com.jw.github_issue_manager.github.GitHubApiClient;
-import com.jw.github_issue_manager.github.GitHubUserProfile;
 import com.jw.github_issue_manager.repository.GitHubAccountRepository;
 import com.jw.github_issue_manager.repository.UserRepository;
 
@@ -26,27 +27,28 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final GitHubAccountRepository gitHubAccountRepository;
-    private final GitHubApiClient gitHubApiClient;
+    private final PlatformGatewayResolver platformGatewayResolver;
     private final PatCryptoService patCryptoService;
 
     public AuthService(
         UserRepository userRepository,
         GitHubAccountRepository gitHubAccountRepository,
-        GitHubApiClient gitHubApiClient,
+        PlatformGatewayResolver platformGatewayResolver,
         PatCryptoService patCryptoService
     ) {
         this.userRepository = userRepository;
         this.gitHubAccountRepository = gitHubAccountRepository;
-        this.gitHubApiClient = gitHubApiClient;
+        this.platformGatewayResolver = platformGatewayResolver;
         this.patCryptoService = patCryptoService;
     }
 
     @Transactional
     public MeResponse registerGitHubToken(RegisterGitHubTokenRequest request, HttpSession session) {
-        GitHubUserProfile userProfile = gitHubApiClient.getAuthenticatedUser(request.accessToken());
+        RemoteUserProfile userProfile = platformGatewayResolver.getGateway(PlatformType.GITHUB)
+            .getAuthenticatedUser(request.accessToken());
         String encryptedToken = patCryptoService.encrypt(request.accessToken());
         LocalDateTime now = LocalDateTime.now();
-        GitHubAccount account = gitHubAccountRepository.findByGithubUserId(userProfile.id())
+        GitHubAccount account = gitHubAccountRepository.findByGithubUserId(Long.parseLong(userProfile.externalUserId()))
             .map(existing -> updateExistingAccount(existing, userProfile, encryptedToken, now))
             .orElseGet(() -> createAccount(userProfile, encryptedToken, now));
 
@@ -117,7 +119,7 @@ public class AuthService {
 
     private GitHubAccount updateExistingAccount(
         GitHubAccount account,
-        GitHubUserProfile userProfile,
+        RemoteUserProfile userProfile,
         String encryptedToken,
         LocalDateTime verifiedAt
     ) {
@@ -132,11 +134,11 @@ public class AuthService {
         return account;
     }
 
-    private GitHubAccount createAccount(GitHubUserProfile userProfile, String encryptedToken, LocalDateTime verifiedAt) {
+    private GitHubAccount createAccount(RemoteUserProfile userProfile, String encryptedToken, LocalDateTime verifiedAt) {
         User user = userRepository.save(new User(resolveDisplayName(userProfile), userProfile.email()));
         GitHubAccount account = new GitHubAccount(
             user,
-            userProfile.id(),
+            Long.parseLong(userProfile.externalUserId()),
             userProfile.login(),
             userProfile.avatarUrl(),
             encryptedToken,
@@ -146,8 +148,10 @@ public class AuthService {
         return gitHubAccountRepository.save(account);
     }
 
-    private String resolveDisplayName(GitHubUserProfile userProfile) {
-        return userProfile.name() == null || userProfile.name().isBlank() ? userProfile.login() : userProfile.name();
+    private String resolveDisplayName(RemoteUserProfile userProfile) {
+        return userProfile.displayName() == null || userProfile.displayName().isBlank()
+            ? userProfile.login()
+            : userProfile.displayName();
     }
 
     private MeResponse toMeResponse(GitHubAccount account) {
