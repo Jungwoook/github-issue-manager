@@ -40,8 +40,8 @@ public class RepositoryService {
 
     @Transactional(readOnly = true)
     public List<RepositoryResponse> getRepositories(HttpSession session) {
-        String login = authService.requireCurrentAccount(session).getLogin();
-        return repositoryCacheRepository.findByOwnerLoginOrderByFullNameAsc(login).stream()
+        String login = authService.requireCurrentAccount(session).getAccountLogin();
+        return repositoryCacheRepository.findByPlatformAndOwnerKeyOrderByFullNameAsc(PlatformType.GITHUB, login).stream()
             .map(this::toResponse)
             .toList();
     }
@@ -58,7 +58,7 @@ public class RepositoryService {
 
         syncStateService.recordSuccess(
             SyncResourceType.REPOSITORY_LIST,
-            account.getLogin(),
+            account.getAccountLogin(),
             "Repository cache refreshed."
         );
 
@@ -78,11 +78,14 @@ public class RepositoryService {
 
     @Transactional(readOnly = true)
     public RepositoryCache requireAccessibleRepository(Long githubRepositoryId, HttpSession session) {
-        String login = authService.requireCurrentAccount(session).getLogin();
-        RepositoryCache repository = repositoryCacheRepository.findByGithubRepositoryId(githubRepositoryId)
+        String login = authService.requireCurrentAccount(session).getAccountLogin();
+        RepositoryCache repository = repositoryCacheRepository.findByPlatformAndExternalId(
+                PlatformType.GITHUB,
+                githubRepositoryId.toString()
+            )
             .orElseThrow(() -> new ResourceNotFoundException("REPOSITORY_NOT_FOUND", "Repository was not found."));
 
-        if (!repository.getOwnerLogin().equals(login)) {
+        if (!repository.getOwnerKey().equals(login)) {
             throw new ResourceNotFoundException("REPOSITORY_NOT_FOUND", "Repository was not found.");
         }
 
@@ -91,8 +94,7 @@ public class RepositoryService {
 
     private void upsertRepository(RemoteRepository repositoryInfo) {
         LocalDateTime now = LocalDateTime.now();
-        Long githubRepositoryId = Long.parseLong(repositoryInfo.externalId());
-        repositoryCacheRepository.findByGithubRepositoryId(githubRepositoryId)
+        repositoryCacheRepository.findByPlatformAndExternalId(PlatformType.GITHUB, repositoryInfo.externalId())
             .ifPresentOrElse(
                 existing -> existing.refreshMetadata(
                     repositoryInfo.description(),
@@ -104,7 +106,8 @@ public class RepositoryService {
                 ),
                 () -> repositoryCacheRepository.save(
                     new RepositoryCache(
-                        githubRepositoryId,
+                        PlatformType.GITHUB,
+                        repositoryInfo.externalId(),
                         repositoryInfo.ownerKey(),
                         repositoryInfo.name(),
                         repositoryInfo.fullName(),
@@ -121,12 +124,12 @@ public class RepositoryService {
 
     private RepositoryResponse toResponse(RepositoryCache repository) {
         return new RepositoryResponse(
-            repository.getGithubRepositoryId(),
-            repository.getOwnerLogin(),
+            Long.parseLong(repository.getExternalId()),
+            repository.getOwnerKey(),
             repository.getName(),
             repository.getFullName(),
             repository.getDescription(),
-            repository.getHtmlUrl(),
+            repository.getWebUrl(),
             repository.isPrivate(),
             repository.getLastSyncedAt()
         );

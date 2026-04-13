@@ -48,7 +48,10 @@ public class IssueService {
     public List<IssueSummaryResponse> getIssues(Long githubRepositoryId, String keyword, String state, HttpSession session) {
         repositoryService.requireAccessibleRepository(githubRepositoryId, session);
 
-        return issueCacheRepository.findByGithubRepositoryIdOrderByNumberDesc(githubRepositoryId).stream()
+        return issueCacheRepository.findByPlatformAndRepositoryExternalIdOrderByNumberOrKeyDesc(
+                PlatformType.GITHUB,
+                githubRepositoryId.toString()
+            ).stream()
             .filter(issue -> keyword == null || keyword.isBlank() || containsIgnoreCase(issue.getTitle(), keyword) || containsIgnoreCase(issue.getBody(), keyword))
             .filter(issue -> state == null || state.isBlank() || issue.getState().equalsIgnoreCase(state))
             .map(this::toSummaryResponse)
@@ -61,7 +64,7 @@ public class IssueService {
         String personalAccessToken = authService.requirePersonalAccessToken(session);
         List<RemoteIssue> issues = platformGatewayResolver.getGateway(PlatformType.GITHUB).getRepositoryIssues(
             personalAccessToken,
-            repository.getOwnerLogin(),
+            repository.getOwnerKey(),
             repository.getName()
         );
         issues.forEach(issue -> upsertIssue(repository, issue));
@@ -81,7 +84,7 @@ public class IssueService {
         String personalAccessToken = authService.requirePersonalAccessToken(session);
         RemoteIssue createdIssue = platformGatewayResolver.getGateway(PlatformType.GITHUB).createIssue(
             personalAccessToken,
-            repository.getOwnerLogin(),
+            repository.getOwnerKey(),
             repository.getName(),
             request.title(),
             request.body()
@@ -90,7 +93,7 @@ public class IssueService {
 
         syncStateService.recordSuccess(
             SyncResourceType.ISSUE,
-            issueKey(githubRepositoryId, issue.getNumber()),
+            issueKey(githubRepositoryId, issue.getNumberOrKey()),
             "Issue created in cache."
         );
 
@@ -110,7 +113,7 @@ public class IssueService {
 
         RemoteIssue updatedIssue = platformGatewayResolver.getGateway(PlatformType.GITHUB).updateIssue(
             personalAccessToken,
-            repository.getOwnerLogin(),
+            repository.getOwnerKey(),
             repository.getName(),
             issueNumber.toString(),
             request.title() != null ? request.title() : currentIssue.getTitle(),
@@ -121,7 +124,7 @@ public class IssueService {
 
         syncStateService.recordSuccess(
             SyncResourceType.ISSUE,
-            issueKey(githubRepositoryId, issueNumber),
+            issueKey(githubRepositoryId, issueNumber.toString()),
             "Issue cache updated."
         );
 
@@ -134,7 +137,7 @@ public class IssueService {
         String personalAccessToken = authService.requirePersonalAccessToken(session);
         platformGatewayResolver.getGateway(PlatformType.GITHUB).updateIssue(
             personalAccessToken,
-            repository.getOwnerLogin(),
+            repository.getOwnerKey(),
             repository.getName(),
             issueNumber.toString(),
             null,
@@ -144,7 +147,7 @@ public class IssueService {
         refreshIssues(githubRepositoryId, session);
         syncStateService.recordSuccess(
             SyncResourceType.ISSUE,
-            issueKey(githubRepositoryId, issueNumber),
+            issueKey(githubRepositoryId, issueNumber.toString()),
             "Issue was closed on GitHub."
         );
     }
@@ -152,28 +155,35 @@ public class IssueService {
     @Transactional(readOnly = true)
     public SyncStateResponse getIssueSyncState(Long githubRepositoryId, Integer issueNumber, HttpSession session) {
         requireIssue(githubRepositoryId, issueNumber, session);
-        return syncStateService.getSyncState(SyncResourceType.ISSUE, issueKey(githubRepositoryId, issueNumber));
+        return syncStateService.getSyncState(SyncResourceType.ISSUE, issueKey(githubRepositoryId, issueNumber.toString()));
     }
 
     @Transactional(readOnly = true)
     public IssueCache requireIssue(Long githubRepositoryId, Integer issueNumber, HttpSession session) {
         repositoryService.requireAccessibleRepository(githubRepositoryId, session);
-        return issueCacheRepository.findByGithubRepositoryIdAndNumber(githubRepositoryId, issueNumber)
+        return issueCacheRepository.findByPlatformAndRepositoryExternalIdAndNumberOrKey(
+                PlatformType.GITHUB,
+                githubRepositoryId.toString(),
+                issueNumber.toString()
+            )
             .orElseThrow(() -> new ResourceNotFoundException("ISSUE_NOT_FOUND", "Issue was not found."));
     }
 
     private IssueCache upsertIssue(RepositoryCache repository, RemoteIssue issueInfo) {
-        int issueNumber = Integer.parseInt(issueInfo.numberOrKey());
-        long githubIssueId = Long.parseLong(issueInfo.externalId());
-        return issueCacheRepository.findByGithubRepositoryIdAndNumber(repository.getGithubRepositoryId(), issueNumber)
+        return issueCacheRepository.findByPlatformAndRepositoryExternalIdAndNumberOrKey(
+                PlatformType.GITHUB,
+                repository.getExternalId(),
+                issueInfo.numberOrKey()
+            )
             .map(existing -> {
                 existing.update(issueInfo.title(), issueInfo.body(), normalizeState(issueInfo.state(), existing.getState()), issueInfo.updatedAt());
                 return existing;
             })
             .orElseGet(() -> issueCacheRepository.save(new IssueCache(
-                githubIssueId,
-                repository.getGithubRepositoryId(),
-                issueNumber,
+                PlatformType.GITHUB,
+                issueInfo.externalId(),
+                repository.getExternalId(),
+                issueInfo.numberOrKey(),
                 issueInfo.title(),
                 issueInfo.body(),
                 normalizeState(issueInfo.state(), "OPEN"),
@@ -196,14 +206,14 @@ public class IssueService {
         return state.toUpperCase();
     }
 
-    private String issueKey(Long githubRepositoryId, Integer issueNumber) {
-        return githubRepositoryId + ":" + issueNumber;
+    private String issueKey(Long githubRepositoryId, String issueNumberOrKey) {
+        return githubRepositoryId + ":" + issueNumberOrKey;
     }
 
     private IssueSummaryResponse toSummaryResponse(IssueCache issue) {
         return new IssueSummaryResponse(
-            issue.getGithubIssueId(),
-            issue.getNumber(),
+            Long.parseLong(issue.getExternalId()),
+            Integer.parseInt(issue.getNumberOrKey()),
             issue.getTitle(),
             issue.getState(),
             issue.getAuthorLogin(),
@@ -215,9 +225,9 @@ public class IssueService {
 
     private IssueDetailResponse toDetailResponse(IssueCache issue) {
         return new IssueDetailResponse(
-            issue.getGithubIssueId(),
-            issue.getGithubRepositoryId(),
-            issue.getNumber(),
+            Long.parseLong(issue.getExternalId()),
+            Long.parseLong(issue.getRepositoryExternalId()),
+            Integer.parseInt(issue.getNumberOrKey()),
             issue.getTitle(),
             issue.getBody(),
             issue.getState(),

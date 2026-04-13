@@ -2,8 +2,12 @@ package com.jw.github_issue_manager.domain;
 
 import java.time.LocalDateTime;
 
+import com.jw.github_issue_manager.core.platform.PlatformType;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -17,11 +21,15 @@ public class RepositoryCache {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private Long githubRepositoryId;
-
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String ownerLogin;
+    private PlatformType platform;
+
+    @Column(name = "github_repository_id", nullable = false, unique = true)
+    private String externalId;
+
+    @Column(name = "owner_login", nullable = false)
+    private String ownerKey;
 
     @Column(nullable = false)
     private String name;
@@ -35,8 +43,8 @@ public class RepositoryCache {
     @Column(nullable = false)
     private boolean isPrivate;
 
-    @Column(nullable = false)
-    private String htmlUrl;
+    @Column(name = "html_url", nullable = false)
+    private String webUrl;
 
     @Column(nullable = false)
     private String defaultBranch;
@@ -51,24 +59,26 @@ public class RepositoryCache {
     }
 
     public RepositoryCache(
-        Long githubRepositoryId,
-        String ownerLogin,
+        PlatformType platform,
+        String externalId,
+        String ownerKey,
         String name,
         String fullName,
         String description,
         boolean isPrivate,
-        String htmlUrl,
+        String webUrl,
         String defaultBranch,
         LocalDateTime lastPushedAt,
         LocalDateTime lastSyncedAt
     ) {
-        this.githubRepositoryId = githubRepositoryId;
-        this.ownerLogin = ownerLogin;
+        this.platform = platform;
+        this.externalId = externalId;
+        this.ownerKey = ownerKey;
         this.name = name;
         this.fullName = fullName;
         this.description = description;
         this.isPrivate = isPrivate;
-        this.htmlUrl = htmlUrl;
+        this.webUrl = webUrl;
         this.defaultBranch = defaultBranch;
         this.lastPushedAt = lastPushedAt;
         this.lastSyncedAt = lastSyncedAt;
@@ -77,14 +87,14 @@ public class RepositoryCache {
     public void refreshMetadata(
         String description,
         boolean isPrivate,
-        String htmlUrl,
+        String webUrl,
         String defaultBranch,
         LocalDateTime lastPushedAt,
         LocalDateTime lastSyncedAt
     ) {
         this.description = description;
         this.isPrivate = isPrivate;
-        this.htmlUrl = htmlUrl;
+        this.webUrl = webUrl;
         this.defaultBranch = defaultBranch;
         this.lastPushedAt = lastPushedAt;
         this.lastSyncedAt = lastSyncedAt;
@@ -94,12 +104,16 @@ public class RepositoryCache {
         return id;
     }
 
-    public Long getGithubRepositoryId() {
-        return githubRepositoryId;
+    public PlatformType getPlatform() {
+        return platform;
     }
 
-    public String getOwnerLogin() {
-        return ownerLogin;
+    public String getExternalId() {
+        return externalId;
+    }
+
+    public String getOwnerKey() {
+        return ownerKey;
     }
 
     public String getName() {
@@ -118,8 +132,8 @@ public class RepositoryCache {
         return isPrivate;
     }
 
-    public String getHtmlUrl() {
-        return htmlUrl;
+    public String getWebUrl() {
+        return webUrl;
     }
 
     public String getDefaultBranch() {
