@@ -2,8 +2,12 @@ package com.jw.github_issue_manager.domain;
 
 import java.time.LocalDateTime;
 
+import com.jw.github_issue_manager.core.platform.PlatformType;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -15,7 +19,7 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "github_accounts")
-public class GitHubAccount {
+public class PlatformConnection {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,11 +29,15 @@ public class GitHubAccount {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false, unique = true)
-    private Long githubUserId;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private PlatformType platform;
 
-    @Column(nullable = false, unique = true)
-    private String login;
+    @Column(name = "github_user_id", nullable = false, unique = true)
+    private String externalUserId;
+
+    @Column(name = "login", nullable = false, unique = true)
+    private String accountLogin;
 
     @Column
     private String avatarUrl;
@@ -49,13 +57,22 @@ public class GitHubAccount {
     @Column(nullable = false)
     private LocalDateTime lastAuthenticatedAt;
 
-    protected GitHubAccount() {
+    protected PlatformConnection() {
     }
 
-    public GitHubAccount(User user, Long githubUserId, String login, String avatarUrl, String accessTokenEncrypted, String tokenScopes) {
+    public PlatformConnection(
+        User user,
+        PlatformType platform,
+        String externalUserId,
+        String accountLogin,
+        String avatarUrl,
+        String accessTokenEncrypted,
+        String tokenScopes
+    ) {
         this.user = user;
-        this.githubUserId = githubUserId;
-        this.login = login;
+        this.platform = platform;
+        this.externalUserId = externalUserId;
+        this.accountLogin = accountLogin;
         this.avatarUrl = avatarUrl;
         this.accessTokenEncrypted = accessTokenEncrypted;
         this.tokenScopes = tokenScopes;
@@ -66,6 +83,9 @@ public class GitHubAccount {
         LocalDateTime now = LocalDateTime.now();
         connectedAt = now;
         lastAuthenticatedAt = now;
+        if (platform == null) {
+            platform = PlatformType.GITHUB;
+        }
     }
 
     public void touchAuthentication() {
@@ -84,16 +104,20 @@ public class GitHubAccount {
         return user;
     }
 
-    public Long getGithubUserId() {
-        return githubUserId;
+    public PlatformType getPlatform() {
+        return platform;
     }
 
-    public String getLogin() {
-        return login;
+    public String getExternalUserId() {
+        return externalUserId;
     }
 
-    public void setLogin(String login) {
-        this.login = login;
+    public String getAccountLogin() {
+        return accountLogin;
+    }
+
+    public void setAccountLogin(String accountLogin) {
+        this.accountLogin = accountLogin;
     }
 
     public String getAvatarUrl() {

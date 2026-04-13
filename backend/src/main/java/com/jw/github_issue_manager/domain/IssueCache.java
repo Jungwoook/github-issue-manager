@@ -2,8 +2,12 @@ package com.jw.github_issue_manager.domain;
 
 import java.time.LocalDateTime;
 
+import com.jw.github_issue_manager.core.platform.PlatformType;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -12,8 +16,8 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "issue_caches", indexes = {
-    @Index(name = "idx_issue_repository", columnList = "githubRepositoryId"),
-    @Index(name = "idx_issue_repository_number", columnList = "githubRepositoryId,issueNumber", unique = true)
+    @Index(name = "idx_issue_repository", columnList = "platform,github_repository_id"),
+    @Index(name = "idx_issue_repository_number", columnList = "platform,github_repository_id,issueNumber", unique = true)
 })
 public class IssueCache {
 
@@ -21,14 +25,18 @@ public class IssueCache {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private Long githubIssueId;
-
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Long githubRepositoryId;
+    private PlatformType platform;
+
+    @Column(name = "github_issue_id", nullable = false, unique = true)
+    private String externalId;
+
+    @Column(name = "github_repository_id", nullable = false)
+    private String repositoryExternalId;
 
     @Column(name = "issueNumber", nullable = false)
-    private Integer number;
+    private String numberOrKey;
 
     @Column(nullable = false)
     private String title;
@@ -58,9 +66,10 @@ public class IssueCache {
     }
 
     public IssueCache(
-        Long githubIssueId,
-        Long githubRepositoryId,
-        Integer number,
+        PlatformType platform,
+        String externalId,
+        String repositoryExternalId,
+        String numberOrKey,
         String title,
         String body,
         String state,
@@ -70,9 +79,10 @@ public class IssueCache {
         LocalDateTime closedAt,
         LocalDateTime lastSyncedAt
     ) {
-        this.githubIssueId = githubIssueId;
-        this.githubRepositoryId = githubRepositoryId;
-        this.number = number;
+        this.platform = platform;
+        this.externalId = externalId;
+        this.repositoryExternalId = repositoryExternalId;
+        this.numberOrKey = numberOrKey;
         this.title = title;
         this.body = body;
         this.state = state;
@@ -96,16 +106,20 @@ public class IssueCache {
         return id;
     }
 
-    public Long getGithubIssueId() {
-        return githubIssueId;
+    public PlatformType getPlatform() {
+        return platform;
     }
 
-    public Long getGithubRepositoryId() {
-        return githubRepositoryId;
+    public String getExternalId() {
+        return externalId;
     }
 
-    public Integer getNumber() {
-        return number;
+    public String getRepositoryExternalId() {
+        return repositoryExternalId;
+    }
+
+    public String getNumberOrKey() {
+        return numberOrKey;
     }
 
     public String getTitle() {

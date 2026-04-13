@@ -2,8 +2,12 @@ package com.jw.github_issue_manager.domain;
 
 import java.time.LocalDateTime;
 
+import com.jw.github_issue_manager.core.platform.PlatformType;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -12,7 +16,7 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "comment_caches", indexes = {
-    @Index(name = "idx_comment_issue", columnList = "githubIssueId")
+    @Index(name = "idx_comment_issue", columnList = "platform,github_issue_id")
 })
 public class CommentCache {
 
@@ -20,11 +24,15 @@ public class CommentCache {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private Long githubCommentId;
-
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Long githubIssueId;
+    private PlatformType platform;
+
+    @Column(name = "github_comment_id", nullable = false, unique = true)
+    private String externalId;
+
+    @Column(name = "github_issue_id", nullable = false)
+    private String issueExternalId;
 
     @Column(nullable = false)
     private String authorLogin;
@@ -45,16 +53,18 @@ public class CommentCache {
     }
 
     public CommentCache(
-        Long githubCommentId,
-        Long githubIssueId,
+        PlatformType platform,
+        String externalId,
+        String issueExternalId,
         String authorLogin,
         String body,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         LocalDateTime lastSyncedAt
     ) {
-        this.githubCommentId = githubCommentId;
-        this.githubIssueId = githubIssueId;
+        this.platform = platform;
+        this.externalId = externalId;
+        this.issueExternalId = issueExternalId;
         this.authorLogin = authorLogin;
         this.body = body;
         this.createdAt = createdAt;
@@ -66,12 +76,16 @@ public class CommentCache {
         return id;
     }
 
-    public Long getGithubCommentId() {
-        return githubCommentId;
+    public PlatformType getPlatform() {
+        return platform;
     }
 
-    public Long getGithubIssueId() {
-        return githubIssueId;
+    public String getExternalId() {
+        return externalId;
+    }
+
+    public String getIssueExternalId() {
+        return issueExternalId;
     }
 
     public String getAuthorLogin() {
