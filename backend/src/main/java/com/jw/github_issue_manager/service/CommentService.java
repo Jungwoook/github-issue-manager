@@ -1,18 +1,18 @@
 package com.jw.github_issue_manager.service;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.jw.github_issue_manager.core.platform.PlatformGatewayResolver;
+import com.jw.github_issue_manager.core.platform.PlatformType;
+import com.jw.github_issue_manager.core.remote.RemoteComment;
 import com.jw.github_issue_manager.domain.CommentCache;
 import com.jw.github_issue_manager.domain.IssueCache;
 import com.jw.github_issue_manager.domain.SyncResourceType;
 import com.jw.github_issue_manager.dto.comment.CommentResponse;
 import com.jw.github_issue_manager.dto.comment.CreateCommentRequest;
-import com.jw.github_issue_manager.github.GitHubApiClient;
-import com.jw.github_issue_manager.github.GitHubCommentInfo;
 import com.jw.github_issue_manager.repository.CommentCacheRepository;
 
 import jakarta.servlet.http.HttpSession;
@@ -25,7 +25,7 @@ public class CommentService {
     private final RepositoryService repositoryService;
     private final SyncStateService syncStateService;
     private final AuthService authService;
-    private final GitHubApiClient gitHubApiClient;
+    private final PlatformGatewayResolver platformGatewayResolver;
 
     public CommentService(
         CommentCacheRepository commentCacheRepository,
@@ -33,14 +33,14 @@ public class CommentService {
         RepositoryService repositoryService,
         SyncStateService syncStateService,
         AuthService authService,
-        GitHubApiClient gitHubApiClient
+        PlatformGatewayResolver platformGatewayResolver
     ) {
         this.commentCacheRepository = commentCacheRepository;
         this.issueService = issueService;
         this.repositoryService = repositoryService;
         this.syncStateService = syncStateService;
         this.authService = authService;
-        this.gitHubApiClient = gitHubApiClient;
+        this.platformGatewayResolver = platformGatewayResolver;
     }
 
     @Transactional(readOnly = true)
@@ -56,11 +56,11 @@ public class CommentService {
         var repository = repositoryService.requireAccessibleRepository(githubRepositoryId, session);
         IssueCache issue = issueService.requireIssue(githubRepositoryId, issueNumber, session);
         String personalAccessToken = authService.requirePersonalAccessToken(session);
-        List<GitHubCommentInfo> comments = gitHubApiClient.getIssueComments(
+        List<RemoteComment> comments = platformGatewayResolver.getGateway(PlatformType.GITHUB).getIssueComments(
             personalAccessToken,
             repository.getOwnerLogin(),
             repository.getName(),
-            issueNumber
+            issueNumber.toString()
         );
         comments.forEach(comment -> upsertComment(issue, comment));
 
@@ -78,11 +78,11 @@ public class CommentService {
         var repository = repositoryService.requireAccessibleRepository(githubRepositoryId, session);
         IssueCache issue = issueService.requireIssue(githubRepositoryId, issueNumber, session);
         String personalAccessToken = authService.requirePersonalAccessToken(session);
-        GitHubCommentInfo createdComment = gitHubApiClient.createComment(
+        RemoteComment createdComment = platformGatewayResolver.getGateway(PlatformType.GITHUB).createComment(
             personalAccessToken,
             repository.getOwnerLogin(),
             repository.getName(),
-            issueNumber,
+            issueNumber.toString(),
             request.body()
         );
         CommentCache comment = upsertComment(issue, createdComment);
@@ -100,12 +100,13 @@ public class CommentService {
         return githubIssueId.toString();
     }
 
-    private CommentCache upsertComment(IssueCache issue, GitHubCommentInfo commentInfo) {
+    private CommentCache upsertComment(IssueCache issue, RemoteComment commentInfo) {
+        long githubCommentId = Long.parseLong(commentInfo.externalId());
         return commentCacheRepository.findByGithubIssueIdOrderByCreatedAtAsc(issue.getGithubIssueId()).stream()
-            .filter(existing -> existing.getGithubCommentId().equals(commentInfo.id()))
+            .filter(existing -> existing.getGithubCommentId().equals(githubCommentId))
             .findFirst()
             .orElseGet(() -> commentCacheRepository.save(new CommentCache(
-                commentInfo.id(),
+                githubCommentId,
                 issue.getGithubIssueId(),
                 commentInfo.authorLogin(),
                 commentInfo.body(),
