@@ -2,9 +2,12 @@ package com.jw.github_issue_manager.dto.auth;
 
 import java.time.LocalDateTime;
 
-public record GitHubTokenStatusResponse(
+import com.jw.github_issue_manager.core.platform.PlatformType;
+
+public record PlatformTokenStatusResponse(
+    PlatformType platform,
     boolean connected,
-    String githubLogin,
+    String accountLogin,
     String tokenScopes,
     LocalDateTime tokenVerifiedAt
 ) {

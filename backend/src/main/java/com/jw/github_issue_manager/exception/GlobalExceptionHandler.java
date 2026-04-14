@@ -53,6 +53,12 @@ public class GlobalExceptionHandler {
             .body(ErrorResponse.of("GITHUB_API_ERROR", exception.getMessage()));
     }
 
+    @ExceptionHandler(PlatformIntegrationException.class)
+    public ResponseEntity<ErrorResponse> handlePlatformIntegration(PlatformIntegrationException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+            .body(ErrorResponse.of("PLATFORM_INTEGRATION_ERROR", exception.getMessage()));
+    }
+
     @ExceptionHandler(RestClientResponseException.class)
     public ResponseEntity<ErrorResponse> handleGitHubHttp(RestClientResponseException exception) {
         HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());

@@ -39,50 +39,45 @@ public class RepositoryService {
     }
 
     @Transactional(readOnly = true)
-    public List<RepositoryResponse> getRepositories(HttpSession session) {
-        String login = authService.requireCurrentAccount(session).getAccountLogin();
-        return repositoryCacheRepository.findByPlatformAndOwnerKeyOrderByFullNameAsc(PlatformType.GITHUB, login).stream()
+    public List<RepositoryResponse> getRepositories(PlatformType platform, HttpSession session) {
+        String login = authService.requireCurrentConnection(platform, session).getAccountLogin();
+        return repositoryCacheRepository.findByPlatformAndOwnerKeyOrderByFullNameAsc(platform, login).stream()
             .map(this::toResponse)
             .toList();
     }
 
     @Transactional
-    public List<RepositoryResponse> refreshRepositories(HttpSession session) {
-        var account = authService.requireCurrentAccount(session);
-        String personalAccessToken = authService.requirePersonalAccessToken(session);
-        List<RemoteRepository> repositories = platformGatewayResolver.getGateway(PlatformType.GITHUB)
-            .getAccessibleRepositories(personalAccessToken);
-        for (RemoteRepository repository : repositories) {
-            upsertRepository(repository);
-        }
+    public List<RepositoryResponse> refreshRepositories(PlatformType platform, HttpSession session) {
+        var connection = authService.requireCurrentConnection(platform, session);
+        String accessToken = authService.requirePlatformAccessToken(platform, session);
+        List<RemoteRepository> repositories = platformGatewayResolver.getGateway(platform)
+            .getAccessibleRepositories(accessToken);
+        repositories.forEach(this::upsertRepository);
 
         syncStateService.recordSuccess(
             SyncResourceType.REPOSITORY_LIST,
-            account.getAccountLogin(),
+            platform.name() + ":" + connection.getAccountLogin(),
             "Repository cache refreshed."
         );
 
-        return getRepositories(session);
+        return getRepositories(platform, session);
     }
 
     @Transactional(readOnly = true)
-    public RepositoryResponse getRepository(Long githubRepositoryId, HttpSession session) {
-        return toResponse(requireAccessibleRepository(githubRepositoryId, session));
+    public RepositoryResponse getRepository(PlatformType platform, String repositoryId, HttpSession session) {
+        return toResponse(requireAccessibleRepository(platform, repositoryId, session));
     }
 
     @Transactional(readOnly = true)
-    public SyncStateResponse getRepositorySyncState(Long githubRepositoryId, HttpSession session) {
-        requireAccessibleRepository(githubRepositoryId, session);
-        return syncStateService.getSyncState(SyncResourceType.REPOSITORY, githubRepositoryId.toString());
+    public SyncStateResponse getRepositorySyncState(PlatformType platform, String repositoryId, HttpSession session) {
+        requireAccessibleRepository(platform, repositoryId, session);
+        return syncStateService.getSyncState(SyncResourceType.REPOSITORY, resourceKey(platform, repositoryId));
     }
 
     @Transactional(readOnly = true)
-    public RepositoryCache requireAccessibleRepository(Long githubRepositoryId, HttpSession session) {
-        String login = authService.requireCurrentAccount(session).getAccountLogin();
-        RepositoryCache repository = repositoryCacheRepository.findByPlatformAndExternalId(
-                PlatformType.GITHUB,
-                githubRepositoryId.toString()
-            )
+    public RepositoryCache requireAccessibleRepository(PlatformType platform, String repositoryId, HttpSession session) {
+        String login = authService.requireCurrentConnection(platform, session).getAccountLogin();
+        RepositoryCache repository = repositoryCacheRepository.findByPlatformAndExternalId(platform, repositoryId)
             .orElseThrow(() -> new ResourceNotFoundException("REPOSITORY_NOT_FOUND", "Repository was not found."));
 
         if (!repository.getOwnerKey().equals(login)) {
@@ -94,7 +89,7 @@ public class RepositoryService {
 
     private void upsertRepository(RemoteRepository repositoryInfo) {
         LocalDateTime now = LocalDateTime.now();
-        repositoryCacheRepository.findByPlatformAndExternalId(PlatformType.GITHUB, repositoryInfo.externalId())
+        repositoryCacheRepository.findByPlatformAndExternalId(repositoryInfo.platform(), repositoryInfo.externalId())
             .ifPresentOrElse(
                 existing -> existing.refreshMetadata(
                     repositoryInfo.description(),
@@ -106,7 +101,7 @@ public class RepositoryService {
                 ),
                 () -> repositoryCacheRepository.save(
                     new RepositoryCache(
-                        PlatformType.GITHUB,
+                        repositoryInfo.platform(),
                         repositoryInfo.externalId(),
                         repositoryInfo.ownerKey(),
                         repositoryInfo.name(),
@@ -122,9 +117,14 @@ public class RepositoryService {
             );
     }
 
+    private String resourceKey(PlatformType platform, String repositoryId) {
+        return platform.name() + ":" + repositoryId;
+    }
+
     private RepositoryResponse toResponse(RepositoryCache repository) {
         return new RepositoryResponse(
-            Long.parseLong(repository.getExternalId()),
+            repository.getPlatform(),
+            repository.getExternalId(),
             repository.getOwnerKey(),
             repository.getName(),
             repository.getFullName(),

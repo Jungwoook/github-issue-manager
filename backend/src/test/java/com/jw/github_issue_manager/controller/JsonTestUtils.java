@@ -17,6 +17,10 @@ final class JsonTestUtils {
         return value.longValue();
     }
 
+    static String readString(String json, String expression) {
+        return JsonPath.read(json, expression);
+    }
+
     static String queryParameter(String uri, String key) {
         String query = URI.create(uri).getQuery();
         return Arrays.stream(query.split("&"))

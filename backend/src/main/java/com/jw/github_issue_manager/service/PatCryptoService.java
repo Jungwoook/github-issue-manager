@@ -9,10 +9,10 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.jw.github_issue_manager.github.GitHubApiException;
-import com.jw.github_issue_manager.github.GitHubIntegrationProperties;
+import com.jw.github_issue_manager.exception.PlatformIntegrationException;
 
 @Service
 public class PatCryptoService {
@@ -23,11 +23,13 @@ public class PatCryptoService {
     private static final int GCM_IV_LENGTH_BYTES = 12;
     private static final String CIPHER_TEXT_VERSION = "v2";
 
-    private final GitHubIntegrationProperties properties;
+    private final String patEncryptionKey;
     private final SecureRandom secureRandom = new SecureRandom();
 
-    public PatCryptoService(GitHubIntegrationProperties properties) {
-        this.properties = properties;
+    public PatCryptoService(
+        @Value("${app.security.pat-encryption-key:${app.github.pat-encryption-key:}}") String patEncryptionKey
+    ) {
+        this.patEncryptionKey = patEncryptionKey;
     }
 
     public String encrypt(String plainText) {
@@ -49,7 +51,7 @@ public class PatCryptoService {
                 + ":"
                 + Base64.getEncoder().encodeToString(encrypted);
         } catch (Exception exception) {
-            throw new GitHubApiException("Failed to encrypt GitHub personal access token.", exception);
+            throw new PlatformIntegrationException("Failed to encrypt platform access token.", exception);
         }
     }
 
@@ -57,7 +59,7 @@ public class PatCryptoService {
         try {
             String[] parts = encryptedText.split(":");
             if (parts.length != 3 || !CIPHER_TEXT_VERSION.equals(parts[0])) {
-                throw new GitHubApiException("Unsupported PAT cipher text format.");
+                throw new PlatformIntegrationException("Unsupported platform access token cipher text format.");
             }
 
             byte[] iv = Base64.getDecoder().decode(parts[1]);
@@ -72,20 +74,20 @@ public class PatCryptoService {
 
             return new String(cipher.doFinal(encrypted), StandardCharsets.UTF_8);
         } catch (Exception exception) {
-            throw new GitHubApiException("Failed to process GitHub personal access token.", exception);
+            throw new PlatformIntegrationException("Failed to process platform access token.", exception);
         }
     }
 
     private byte[] secretKey() {
-        String rawKey = properties.patEncryptionKey();
+        String rawKey = patEncryptionKey;
         if (rawKey == null || rawKey.isBlank()) {
-            throw new GitHubApiException("PAT encryption key is not configured.");
+            throw new PlatformIntegrationException("Platform access token encryption key is not configured.");
         }
 
         try {
             return MessageDigest.getInstance("SHA-256").digest(rawKey.getBytes(StandardCharsets.UTF_8));
         } catch (Exception exception) {
-            throw new GitHubApiException("Failed to initialize PAT encryption key.", exception);
+            throw new PlatformIntegrationException("Failed to initialize platform access token encryption key.", exception);
         }
     }
 }

@@ -44,7 +44,7 @@ class ApiFlowIntegrationTest {
     void githubCacheApiFlowWorks() throws Exception {
         MockHttpSession session = new MockHttpSession();
 
-        mockMvc.perform(post("/api/github/token")
+        mockMvc.perform(post("/api/platforms/github/token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -53,33 +53,37 @@ class ApiFlowIntegrationTest {
                     """)
                 .session(session))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.githubLogin").value("tester"));
+            .andExpect(jsonPath("$.platform").value("GITHUB"))
+            .andExpect(jsonPath("$.accountLogin").value("tester"));
 
-        mockMvc.perform(get("/api/github/token/status").session(session))
+        mockMvc.perform(get("/api/platforms/github/token/status").session(session))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.connected").value(true))
-            .andExpect(jsonPath("$.githubLogin").value("tester"));
+            .andExpect(jsonPath("$.platform").value("GITHUB"))
+            .andExpect(jsonPath("$.accountLogin").value("tester"));
 
         mockMvc.perform(get("/api/me").session(session))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.displayName").value("Tester"));
+            .andExpect(jsonPath("$.displayName").value("Tester"))
+            .andExpect(jsonPath("$.platform").value("GITHUB"));
 
-        MvcResult repositoryRefresh = mockMvc.perform(post("/api/repositories/refresh").session(session))
+        MvcResult repositoryRefresh = mockMvc.perform(post("/api/platforms/github/repositories/refresh").session(session))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].ownerLogin").value("tester"))
+            .andExpect(jsonPath("$[0].platform").value("GITHUB"))
+            .andExpect(jsonPath("$[0].ownerKey").value("tester"))
             .andReturn();
 
-        long repositoryId = JsonTestUtils.readLong(repositoryRefresh.getResponse().getContentAsString(), "$[0].githubRepositoryId");
+        String repositoryId = JsonTestUtils.readString(repositoryRefresh.getResponse().getContentAsString(), "$[0].repositoryId");
 
-        mockMvc.perform(get("/api/repositories/{repositoryId}", repositoryId).session(session))
+        mockMvc.perform(get("/api/platforms/github/repositories/{repositoryId}", repositoryId).session(session))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.githubRepositoryId").value(repositoryId));
+            .andExpect(jsonPath("$.repositoryId").value(repositoryId));
 
-        mockMvc.perform(post("/api/repositories/{repositoryId}/issues/refresh", repositoryId).session(session))
+        mockMvc.perform(post("/api/platforms/github/repositories/{repositoryId}/issues/refresh", repositoryId).session(session))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].number").value(2));
+            .andExpect(jsonPath("$[0].numberOrKey").value("2"));
 
-        mockMvc.perform(post("/api/repositories/{repositoryId}/issues", repositoryId)
+        mockMvc.perform(post("/api/platforms/github/repositories/{repositoryId}/issues", repositoryId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -92,13 +96,13 @@ class ApiFlowIntegrationTest {
             .andExpect(jsonPath("$.title").value("New issue"))
             .andExpect(jsonPath("$.state").value("OPEN"));
 
-        mockMvc.perform(get("/api/repositories/{repositoryId}/issues", repositoryId)
+        mockMvc.perform(get("/api/platforms/github/repositories/{repositoryId}/issues", repositoryId)
                 .param("keyword", "New")
                 .session(session))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].title").value("New issue"));
 
-        mockMvc.perform(patch("/api/repositories/{repositoryId}/issues/{issueNumber}", repositoryId, 3)
+        mockMvc.perform(patch("/api/platforms/github/repositories/{repositoryId}/issues/{issueNumber}", repositoryId, 3)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -109,12 +113,12 @@ class ApiFlowIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.state").value("CLOSED"));
 
-        mockMvc.perform(post("/api/repositories/{repositoryId}/issues/{issueNumber}/comments/refresh", repositoryId, 3)
+        mockMvc.perform(post("/api/platforms/github/repositories/{repositoryId}/issues/{issueNumber}/comments/refresh", repositoryId, 3)
                 .session(session))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].authorLogin").value("tester"));
 
-        mockMvc.perform(post("/api/repositories/{repositoryId}/issues/{issueNumber}/comments", repositoryId, 3)
+        mockMvc.perform(post("/api/platforms/github/repositories/{repositoryId}/issues/{issueNumber}/comments", repositoryId, 3)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -125,14 +129,14 @@ class ApiFlowIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.body").value("Confirmed."));
 
-        mockMvc.perform(get("/api/repositories/{repositoryId}/issues/{issueNumber}/sync-state", repositoryId, 3).session(session))
+        mockMvc.perform(get("/api/platforms/github/repositories/{repositoryId}/issues/{issueNumber}/sync-state", repositoryId, 3).session(session))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.resourceType").value("ISSUE"));
 
-        mockMvc.perform(delete("/api/repositories/{repositoryId}/issues/{issueNumber}", repositoryId, 3).session(session))
+        mockMvc.perform(delete("/api/platforms/github/repositories/{repositoryId}/issues/{issueNumber}", repositoryId, 3).session(session))
             .andExpect(status().isNoContent());
 
-        mockMvc.perform(delete("/api/github/token").session(session))
+        mockMvc.perform(delete("/api/platforms/github/token").session(session))
             .andExpect(status().isNoContent());
 
         mockMvc.perform(get("/api/me").session(session))

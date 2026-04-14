@@ -5,8 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.Test;
 
-import com.jw.github_issue_manager.github.GitHubApiException;
-import com.jw.github_issue_manager.github.GitHubIntegrationProperties;
+import com.jw.github_issue_manager.exception.PlatformIntegrationException;
 
 class PatCryptoServiceTest {
 
@@ -14,7 +13,7 @@ class PatCryptoServiceTest {
 
     @Test
     void encryptAndDecryptRoundTrip() {
-        PatCryptoService service = new PatCryptoService(new GitHubIntegrationProperties("https://api.github.com", RAW_KEY));
+        PatCryptoService service = new PatCryptoService(RAW_KEY);
 
         String encrypted = service.encrypt("github_pat_round_trip");
 
@@ -24,7 +23,7 @@ class PatCryptoServiceTest {
 
     @Test
     void encryptUsesRandomIvForEachToken() {
-        PatCryptoService service = new PatCryptoService(new GitHubIntegrationProperties("https://api.github.com", RAW_KEY));
+        PatCryptoService service = new PatCryptoService(RAW_KEY);
 
         String first = service.encrypt("github_pat_same_value");
         String second = service.encrypt("github_pat_same_value");
@@ -34,22 +33,22 @@ class PatCryptoServiceTest {
 
     @Test
     void decryptRejectsUnsupportedFormat() {
-        PatCryptoService service = new PatCryptoService(new GitHubIntegrationProperties("https://api.github.com", RAW_KEY));
+        PatCryptoService service = new PatCryptoService(RAW_KEY);
 
         assertThatThrownBy(() -> service.decrypt("legacy-base64-value"))
-            .isInstanceOf(GitHubApiException.class)
-            .hasMessage("Failed to process GitHub personal access token.");
+            .isInstanceOf(PlatformIntegrationException.class)
+            .hasMessage("Failed to process platform access token.");
     }
 
     @Test
     void decryptFailsWhenCipherTextIsTampered() {
-        PatCryptoService service = new PatCryptoService(new GitHubIntegrationProperties("https://api.github.com", RAW_KEY));
+        PatCryptoService service = new PatCryptoService(RAW_KEY);
         String encrypted = service.encrypt("github_pat_tamper");
         String[] parts = encrypted.split(":");
         String tampered = parts[0] + ":" + parts[1] + ":" + parts[2].substring(0, parts[2].length() - 2) + "AA";
 
         assertThatThrownBy(() -> service.decrypt(tampered))
-            .isInstanceOf(GitHubApiException.class)
-            .hasMessage("Failed to process GitHub personal access token.");
+            .isInstanceOf(PlatformIntegrationException.class)
+            .hasMessage("Failed to process platform access token.");
     }
 }
