@@ -9,6 +9,7 @@ import {
   registerGitHubToken,
 } from '@/entities/github/api/githubTokenApi';
 import { refreshRepositories } from '@/entities/repository/api/repositoryApi';
+import { DEFAULT_PLATFORM } from '@/shared/constants/platform';
 import { queryKeys } from '@/shared/constants/queryKeys';
 import { formatDate } from '@/shared/lib/formatDate';
 import { getErrorMessage } from '@/shared/lib/getErrorMessage';
@@ -20,7 +21,7 @@ export function GitHubTokenForm() {
   const [isTokenVisible, setIsTokenVisible] = useState(false);
 
   const tokenStatusQuery = useQuery({
-    queryKey: queryKeys.githubTokenStatus,
+    queryKey: queryKeys.platformTokenStatus(DEFAULT_PLATFORM),
     queryFn: getGitHubTokenStatus,
     retry: false,
   });
@@ -37,8 +38,8 @@ export function GitHubTokenForm() {
         // Keep PAT registration successful even if the first sync fails.
       }
 
-      await queryClient.invalidateQueries({ queryKey: queryKeys.githubTokenStatus });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.repositories });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.platformTokenStatus(DEFAULT_PLATFORM) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.repositories(DEFAULT_PLATFORM) });
       navigate('/repositories');
     },
   });
@@ -46,8 +47,8 @@ export function GitHubTokenForm() {
   const disconnectMutation = useMutation({
     mutationFn: disconnectGitHubToken,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.githubTokenStatus });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.repositories });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.platformTokenStatus(DEFAULT_PLATFORM) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.repositories(DEFAULT_PLATFORM) });
     },
   });
 
@@ -72,7 +73,7 @@ export function GitHubTokenForm() {
         {registerMutation.isSuccess ? (
           <div className="success-banner">PAT가 등록되었고 저장소 화면으로 이동합니다.</div>
         ) : null}
-        {disconnectMutation.isSuccess ? <div className="success-banner">PAT 연결을 해제했습니다.</div> : null}
+        {disconnectMutation.isSuccess ? <div className="success-banner">PAT 연결이 해제되었습니다.</div> : null}
 
         <div className="github-status-panel">
           <div className="github-status-item">
@@ -81,7 +82,7 @@ export function GitHubTokenForm() {
           </div>
           <div className="github-status-item">
             <span className="muted">GitHub 계정</span>
-            <strong>{status?.githubLogin ?? '-'}</strong>
+            <strong>{status?.accountLogin ?? '-'}</strong>
           </div>
           <div className="github-status-item">
             <span className="muted">최근 확인</span>
@@ -167,7 +168,7 @@ export function GitHubTokenForm() {
             <p className="muted">Metadata 읽기, Issues 읽기/쓰기</p>
           </div>
           <div className="detail-card">
-            <h4 className="card-title">접근 범위</h4>
+            <h4 className="card-title">적용 범위</h4>
             <p className="muted">처음에는 관리할 본인 저장소만 선택하는 것을 권장합니다.</p>
           </div>
         </div>

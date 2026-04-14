@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { getIssueDetail, updateIssue } from '@/entities/issue/api/issueApi';
+import { DEFAULT_PLATFORM } from '@/shared/constants/platform';
 import { queryKeys } from '@/shared/constants/queryKeys';
 import { getErrorMessage } from '@/shared/lib/getErrorMessage';
 import { PageHeader } from '@/shared/ui/PageHeader';
@@ -15,7 +16,7 @@ export function IssueEditPage() {
   const { repositoryId, issueId } = useParams();
 
   const issueQuery = useQuery({
-    queryKey: queryKeys.issue(repositoryId ?? '', issueId ?? ''),
+    queryKey: queryKeys.issue(DEFAULT_PLATFORM, repositoryId ?? '', issueId ?? ''),
     queryFn: () => getIssueDetail(repositoryId ?? '', issueId ?? ''),
     enabled: Boolean(repositoryId && issueId),
   });
@@ -26,17 +27,17 @@ export function IssueEditPage() {
         title: values.title,
         body: values.content || undefined,
       } as never),
-    onSuccess: (issue: { number: number }) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.issue(repositoryId ?? '', issue.number) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.issuesRoot(repositoryId ?? '') });
-      void navigate(`/repositories/${repositoryId}/issues/${issue.number}`);
+    onSuccess: (issue: { numberOrKey: string }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.issue(DEFAULT_PLATFORM, repositoryId ?? '', issue.numberOrKey) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.issuesRoot(DEFAULT_PLATFORM, repositoryId ?? '') });
+      void navigate(`/repositories/${repositoryId}/issues/${issue.numberOrKey}`);
     },
   });
 
   const initialValues = useMemo(
     () => ({
       title: issueQuery.data?.title ?? '',
-      content: (issueQuery.data as { body?: string | null } | undefined)?.body ?? '',
+      content: issueQuery.data?.body ?? '',
     }),
     [issueQuery.data],
   );

@@ -18,19 +18,19 @@ export function IssueDetailSection({ repositoryId, issue, comments }: IssueDetai
         <div className="card-header">
           <div className="stack-sm">
             <h3 className="section-title">{issue.title}</h3>
-            <span className="muted">이슈 #{issue.number} 생성일 {formatDate(issue.createdAt)}</span>
+            <span className="muted">이슈 #{issue.numberOrKey} 생성일 {formatDate(issue.createdAt)}</span>
           </div>
           <div className="toolbar-actions">
-            <Link className="button" to={`/repositories/${repositoryId}/issues/${issue.number}/edit`}>
+            <Link className="button" to={`/repositories/${repositoryId}/issues/${issue.numberOrKey}/edit`}>
               이슈 수정
             </Link>
           </div>
         </div>
 
         <div className="stack-sm">
-          <IssueMetaTags status={issue.status} />
+          <IssueMetaTags state={issue.state} />
           <div className="meta-list">
-            <span className="muted">작성자: {issue.authorLogin ?? '-'}</span>
+            <span className="muted">작성자 {issue.authorLogin ?? '-'}</span>
             <span className="muted">최종 수정: {formatDate(issue.updatedAt)}</span>
           </div>
         </div>
@@ -45,7 +45,7 @@ export function IssueDetailSection({ repositoryId, issue, comments }: IssueDetai
         <div className="card-header">
           <div>
             <h3 className="section-title">댓글</h3>
-            <p className="muted">GitHub 이슈 댓글 목록입니다.</p>
+            <p className="muted">이슈 댓글 목록입니다.</p>
           </div>
         </div>
 
@@ -54,7 +54,7 @@ export function IssueDetailSection({ repositoryId, issue, comments }: IssueDetai
         ) : (
           <div className="comment-list">
             {comments.map((comment) => (
-              <article key={comment.githubCommentId} className="comment-card">
+              <article key={comment.commentId} className="comment-card">
                 <div className="row-between">
                   <div className="stack-sm">
                     <strong>{comment.authorLogin}</strong>

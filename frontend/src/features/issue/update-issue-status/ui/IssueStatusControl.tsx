@@ -1,16 +1,16 @@
 import type { ChangeEvent } from 'react';
 
-import type { IssueStatus } from '@/entities/issue/model/types';
+import type { IssueState } from '@/entities/issue/model/types';
 
 interface IssueStatusControlProps {
-  value: IssueStatus;
+  value: IssueState;
   disabled?: boolean;
-  onChange: (nextStatus: IssueStatus) => void;
+  onChange: (nextStatus: IssueState) => void;
 }
 
 export function IssueStatusControl({ value, disabled, onChange }: IssueStatusControlProps) {
   const handleChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    onChange(event.target.value as IssueStatus);
+    onChange(event.target.value as IssueState);
   };
 
   return (

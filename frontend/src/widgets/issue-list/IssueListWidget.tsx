@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteIssue, getIssues, refreshIssues } from '@/entities/issue/api/issueApi';
 import { IssueMetaTags } from '@/entities/issue/ui/IssueMetaTags';
 import { getRepository } from '@/entities/repository/api/repositoryApi';
+import { DEFAULT_PLATFORM } from '@/shared/constants/platform';
 import { queryKeys } from '@/shared/constants/queryKeys';
 import { formatDate } from '@/shared/lib/formatDate';
 import { getErrorMessage } from '@/shared/lib/getErrorMessage';
@@ -17,13 +18,13 @@ export function IssueListWidget() {
   const [state, setState] = useState('');
 
   const repositoryQuery = useQuery({
-    queryKey: queryKeys.repository(repositoryId ?? ''),
+    queryKey: queryKeys.repository(DEFAULT_PLATFORM, repositoryId ?? ''),
     queryFn: () => getRepository(repositoryId ?? ''),
     enabled: Boolean(repositoryId),
   });
 
   const issuesQuery = useQuery({
-    queryKey: queryKeys.issues(repositoryId ?? '', { keyword, state }),
+    queryKey: queryKeys.issues(DEFAULT_PLATFORM, repositoryId ?? '', { keyword, state }),
     queryFn: () =>
       getIssues(repositoryId ?? '', {
         keyword: keyword || undefined,
@@ -35,14 +36,14 @@ export function IssueListWidget() {
   const refreshIssuesMutation = useMutation({
     mutationFn: () => refreshIssues(repositoryId ?? ''),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.issuesRoot(repositoryId ?? '') });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.issuesRoot(DEFAULT_PLATFORM, repositoryId ?? '') });
     },
   });
 
   const deleteIssueMutation = useMutation({
-    mutationFn: (issueId: number) => deleteIssue(repositoryId ?? '', issueId),
+    mutationFn: (issueId: string) => deleteIssue(repositoryId ?? '', issueId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.issuesRoot(repositoryId ?? '') });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.issuesRoot(DEFAULT_PLATFORM, repositoryId ?? '') });
     },
   });
 
@@ -50,13 +51,7 @@ export function IssueListWidget() {
     return <div className="error-banner">경로에 저장소 ID가 없습니다.</div>;
   }
 
-  const issues = (issuesQuery.data ?? []) as Array<{
-    number: number;
-    title: string;
-    status: 'OPEN' | 'CLOSED';
-    authorLogin?: string | null;
-    updatedAt: string;
-  }>;
+  const issues = issuesQuery.data ?? [];
 
   return (
     <div className="page-stack">
@@ -64,14 +59,11 @@ export function IssueListWidget() {
         <section className="stats-grid">
           <article className="stat-card">
             <p className="muted">저장소</p>
-            <p className="stat-card-value">
-              {(repositoryQuery.data as { fullName?: string; name?: string }).fullName ??
-                (repositoryQuery.data as { name?: string }).name}
-            </p>
+            <p className="stat-card-value">{repositoryQuery.data.fullName ?? repositoryQuery.data.name}</p>
           </article>
           <article className="stat-card">
             <p className="muted">열린 이슈</p>
-            <p className="stat-card-value">{issues.filter((issue) => issue.status === 'OPEN').length}</p>
+            <p className="stat-card-value">{issues.filter((issue) => issue.state === 'OPEN').length}</p>
           </article>
           <article className="stat-card">
             <p className="muted">전체 이슈</p>
@@ -122,7 +114,7 @@ export function IssueListWidget() {
         <div className="card-header">
           <div>
             <h3 className="section-title">이슈 목록</h3>
-            <p className="muted">선택한 저장소의 GitHub 이슈 목록입니다.</p>
+            <p className="muted">선택한 저장소의 이슈 목록입니다.</p>
           </div>
         </div>
 
@@ -158,33 +150,33 @@ export function IssueListWidget() {
               </thead>
               <tbody>
                 {issues.map((issue) => (
-                  <tr key={issue.number}>
+                  <tr key={issue.issueId}>
                     <td>
                       <div className="stack-sm">
-                        <Link className="issue-title-link" to={`/repositories/${repositoryId}/issues/${issue.number}`}>
+                        <Link className="issue-title-link" to={`/repositories/${repositoryId}/issues/${issue.numberOrKey}`}>
                           {issue.title}
                         </Link>
-                        <span className="muted">#{issue.number}</span>
+                        <span className="muted">#{issue.numberOrKey}</span>
                       </div>
                     </td>
                     <td>
-                      <IssueMetaTags status={issue.status} />
+                      <IssueMetaTags state={issue.state} />
                     </td>
                     <td>{issue.authorLogin ?? '-'}</td>
                     <td>{formatDate(issue.updatedAt)}</td>
                     <td>
                       <div className="toolbar-actions">
-                        <Link className="inline-button" to={`/repositories/${repositoryId}/issues/${issue.number}`}>
+                        <Link className="inline-button" to={`/repositories/${repositoryId}/issues/${issue.numberOrKey}`}>
                           열기
                         </Link>
-                        <Link className="inline-button" to={`/repositories/${repositoryId}/issues/${issue.number}/edit`}>
+                        <Link className="inline-button" to={`/repositories/${repositoryId}/issues/${issue.numberOrKey}/edit`}>
                           수정
                         </Link>
                         <button
                           className="inline-button button-danger"
                           type="button"
                           disabled={deleteIssueMutation.isPending}
-                          onClick={() => deleteIssueMutation.mutate(issue.number)}
+                          onClick={() => deleteIssueMutation.mutate(issue.numberOrKey)}
                         >
                           닫기
                         </button>

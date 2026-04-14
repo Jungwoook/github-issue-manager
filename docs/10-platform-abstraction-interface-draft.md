@@ -383,6 +383,209 @@ List<RemoteIssue> issues = gateway.getRepositoryIssues(
 
 즉, 프론트 리팩토링은 2차 백엔드 리팩토링 완료 후 후속 단계로 분리한다.
 
+### 15.1 백엔드 3차 리팩토링 이후 프론트에 필요한 변경
+
+현재 백엔드 변경은 기능 추가보다 API 경로, DTO 필드명, 플랫폼 선택 방식 변경의 성격이 강하다.
+따라서 프론트는 화면 기능을 새로 만드는 것보다 기존 GitHub 전용 구조를 플랫폼 공통 구조로 옮기는 작업이 우선이다.
+
+### 15.2 필수 변경 범위
+
+#### A. 인증 API 경로 변경 반영
+
+- 기존: `/api/github/token`, `/api/github/token/status`
+- 변경: `/api/platforms/{platform}/token`, `/api/platforms/{platform}/token/status`
+- 프론트 영향:
+  - `entities/github/api/githubTokenApi.ts`
+  - `widgets/github-token/*`
+  - GitHub 연결 상태를 조회하는 레이아웃/사이드바 위젯
+
+인증 화면은 내부적으로 `platform = 'github'`를 넘기는 공통 API 호출 형태로 바꿔야 한다.
+초기 화면은 GitHub만 보여줘도 되지만, API 함수 시그니처는 플랫폼을 받을 수 있게 만들어야 한다.
+
+#### B. 저장소/이슈/댓글 API 경로 변경 반영
+
+- 기존: `/api/repositories/...`
+- 변경: `/api/platforms/{platform}/repositories/...`
+- 프론트 영향:
+  - 저장소 목록 API
+  - 이슈 목록/상세/생성/수정 API
+  - 댓글 목록/생성 API
+  - 라우터 경로와 링크 생성 로직
+
+프론트는 더 이상 저장소와 이슈를 GitHub 전용 리소스로 취급하지 않고,
+모든 API 호출과 링크 생성 시 `platform` 파라미터를 함께 다루도록 바꿔야 한다.
+
+#### C. DTO 필드명 변경 반영
+
+백엔드 응답은 GitHub 전용 필드명에서 공통 필드명으로 바뀌었다.
+
+- `githubLogin` -> `accountLogin`
+- `githubRepositoryId` -> `repositoryId`
+- `ownerLogin` -> `ownerKey`
+- `htmlUrl` -> `webUrl`
+- `githubIssueId` -> `issueId`
+- `number` -> `numberOrKey`
+- `githubCommentId` -> `commentId`
+- `MeResponse`에 `platform` 필드 추가
+
+프론트 영향:
+
+- `entities/repository/model/types.ts`
+- `entities/issue/model/types.ts`
+- `entities/comment/model/types.ts`
+- `entities/github/model/types.ts`
+- 응답 변환 로직이 있는 API 계층 전체
+
+이 단계에서는 타입 정의와 매핑 함수를 먼저 바꾸고,
+컴포넌트는 새 타입명을 따라가도록 순차적으로 수정하는 방식이 안전하다.
+
+### 15.3 구조 리팩토링 권장 방향
+
+#### A. GitHub 전용 엔티티 모듈을 플랫폼 연결 모듈로 승격
+
+- 현재:
+  - `entities/github/api/githubTokenApi.ts`
+  - `entities/github/model/types.ts`
+- 권장:
+  - `entities/platform-connection/api/platformConnectionApi.ts`
+  - `entities/platform-connection/model/types.ts`
+
+초기 구현은 내부적으로 GitHub만 지원해도 되지만,
+파일명과 타입명은 GitHub가 아니라 플랫폼 연결 기준으로 바꾸는 것이 맞다.
+
+#### B. 설정 페이지와 위젯 이름 일반화
+
+- 현재:
+  - `GitHubTokenPage`
+  - `GitHubTokenForm`
+  - `GitHubConnectionStatus`
+- 권장:
+  - `PlatformConnectionPage`
+  - `PlatformConnectionForm`
+  - `PlatformConnectionStatus`
+
+초기 UI 문구는 GitHub를 유지할 수 있지만,
+컴포넌트 구조는 플랫폼 파라미터를 받을 수 있는 공통 컴포넌트로 전환하는 것이 좋다.
+
+#### C. 쿼리 키와 라우트 일반화
+
+- 현재:
+  - `queryKeys.githubTokenStatus`
+  - `/settings/github`
+  - `/repositories/:repositoryId/issues`
+- 권장:
+  - `queryKeys.platformTokenStatus(platform)`
+  - `/settings/platforms/:platform`
+  - `/platforms/:platform/repositories/:repositoryId/issues`
+
+프론트 라우트도 백엔드와 같은 축인 `platform` 기준으로 맞추는 것이 이후 확장에 유리하다.
+
+### 15.4 문구와 화면에서 정리할 항목
+
+현재 화면 텍스트에도 GitHub 전용 표현이 많이 남아 있다.
+
+- `GitHub PAT 설정`
+- `GitHub 저장소 목록`
+- `선택한 GitHub 이슈`
+- `GitHub에서 PAT를 발급`
+
+이 문구는 두 단계로 정리하는 것이 좋다.
+
+1. 구조 리팩토링 단계
+- 파일명, 타입명, API 경로, 라우트부터 공통 구조로 변경
+- 화면 문구는 필요한 최소 범위만 수정
+
+2. UI 정리 단계
+- GitHub 전용 문구를 `플랫폼 연결`, `저장소`, `이슈`, `댓글`처럼 일반화
+- GitHub가 필요한 안내 문구만 설정 화면 내부에 국한
+
+### 15.5 프론트 리팩토링 권장 순서
+
+1. 타입 정의와 API 경로를 새 백엔드 계약에 맞춘다.
+2. 쿼리 키와 데이터 패칭 훅을 플랫폼 기준으로 바꾼다.
+3. 라우트를 `/platforms/:platform/...` 구조로 옮긴다.
+4. 설정 화면과 상태 위젯을 `platform-connection` 구조로 통합한다.
+5. 저장소/이슈/댓글 화면의 링크와 필드 사용부를 새 타입 기준으로 정리한다.
+6. 마지막에 GitHub 전용 네이밍과 문구를 일괄 정리한다.
+
+### 15.6 프론트 1차 리팩토링 범위
+
+프론트 1차는 `백엔드 3차 계약에 맞춰 현재 GitHub 화면이 계속 동작하도록 만드는 단계`다.
+
+#### 포함 범위
+
+1. API 경로 변경 반영
+- `/api/github/token` -> `/api/platforms/github/token`
+- `/api/repositories/...` -> `/api/platforms/github/repositories/...`
+
+2. 응답 타입 필드명 변경 반영
+- `githubLogin` -> `accountLogin`
+- `githubRepositoryId` -> `repositoryId`
+- `ownerLogin` -> `ownerKey`
+- `htmlUrl` -> `webUrl`
+- `githubIssueId` -> `issueId`
+- `number` -> `numberOrKey`
+- `githubCommentId` -> `commentId`
+
+3. 프론트 데이터 계층 정리
+- 토큰 API, 저장소 API, 이슈 API, 댓글 API를 새 백엔드 계약에 맞춤
+- query key와 훅이 플랫폼 파라미터를 받을 수 있도록 최소 수정
+
+4. 기존 화면 동작 유지
+- 설정 화면
+- 연결 상태 위젯
+- 저장소 목록
+- 이슈 목록/상세/생성/수정
+- 댓글 조회/등록
+
+#### 1차 목표
+
+- 현재 GitHub 기능이 깨지지 않아야 한다.
+- 프론트가 새 백엔드 경로와 DTO에 맞춰 정상 동작해야 한다.
+- 내부 구현은 공통화 방향으로 옮기되, 화면 구조와 문구는 최소 수정에 그친다.
+
+### 15.7 프론트 2차 리팩토링 범위
+
+프론트 2차는 `GitHub 전용 프론트 구조를 플랫폼 공통 구조로 완전히 정리하는 단계`다.
+
+#### 포함 범위
+
+1. 모듈/파일 구조 일반화
+- `entities/github/*` -> `entities/platform-connection/*`
+- `widgets/github-token/*` -> `widgets/platform-connection/*`
+- `GitHubTokenPage` -> `PlatformConnectionPage`
+
+2. 라우트 구조 일반화
+- `/settings/github` -> `/settings/platforms/:platform`
+- `/repositories/:repositoryId/issues` -> `/platforms/:platform/repositories/:repositoryId/issues`
+
+3. 쿼리 키와 네이밍 일반화
+- `queryKeys.githubTokenStatus` -> `queryKeys.platformTokenStatus(platform)`
+- GitHub 전용 타입명, 함수명, 컴포넌트명 정리
+
+4. 화면 문구 일반화
+- `GitHub PAT 설정`
+- `GitHub 저장소 목록`
+- `선택한 GitHub 이슈`
+- `GitHub에서 PAT를 발급`
+
+위 문구를 `플랫폼 연결`, `저장소`, `이슈`, `댓글` 기준으로 정리하되,
+GitHub 고유 안내는 설정 화면 내부에만 남긴다.
+
+#### 2차 목표
+
+- 코드 구조와 라우트 구조가 모두 플랫폼 중심으로 정리되어야 한다.
+- 이후 GitLab, Jira 같은 플랫폼을 프론트에 추가할 때 동일 패턴으로 붙일 수 있어야 한다.
+
+### 15.8 이번 프론트 작업에서 하지 않아도 되는 것
+
+- GitLab/Jira UI를 바로 추가하는 작업
+- 다중 플랫폼 탭 UI를 한 번에 완성하는 작업
+- 디자인 시스템 전면 개편
+
+이번 단계의 목적은 `GitHub 전용 프론트 구조를 플랫폼 공통 구조로 옮기는 것`이며,
+다른 플랫폼 UI 추가는 그 다음 단계로 분리하는 것이 안전하다.
+
 ## 16. 현재 코드 기준 추천 시작점
 
 현재 코드 기준으로 가장 좋은 시작점은 아래 순서다.

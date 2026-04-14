@@ -1,10 +1,11 @@
 export interface Repository {
-  githubRepositoryId: number;
-  ownerLogin: string;
+  platform: string;
+  repositoryId: string;
+  ownerKey: string;
   name: string;
   fullName: string;
   description: string | null;
-  htmlUrl: string;
+  webUrl: string;
   private: boolean;
   lastSyncedAt: string;
 }
