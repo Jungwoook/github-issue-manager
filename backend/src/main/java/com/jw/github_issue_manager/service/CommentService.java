@@ -44,55 +44,58 @@ public class CommentService {
     }
 
     @Transactional(readOnly = true)
-    public List<CommentResponse> getComments(Long githubRepositoryId, Integer issueNumber, HttpSession session) {
-        IssueCache issue = issueService.requireIssue(githubRepositoryId, issueNumber, session);
-        return commentCacheRepository.findByPlatformAndIssueExternalIdOrderByCreatedAtAsc(
-                PlatformType.GITHUB,
-                issue.getExternalId()
-            ).stream()
+    public List<CommentResponse> getComments(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
+        IssueCache issue = issueService.requireIssue(platform, repositoryId, issueNumberOrKey, session);
+        return commentCacheRepository.findByPlatformAndIssueExternalIdOrderByCreatedAtAsc(platform, issue.getExternalId()).stream()
             .map(this::toResponse)
             .toList();
     }
 
     @Transactional
-    public List<CommentResponse> refreshComments(Long githubRepositoryId, Integer issueNumber, HttpSession session) {
-        var repository = repositoryService.requireAccessibleRepository(githubRepositoryId, session);
-        IssueCache issue = issueService.requireIssue(githubRepositoryId, issueNumber, session);
-        String personalAccessToken = authService.requirePersonalAccessToken(session);
-        List<RemoteComment> comments = platformGatewayResolver.getGateway(PlatformType.GITHUB).getIssueComments(
-            personalAccessToken,
+    public List<CommentResponse> refreshComments(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
+        var repository = repositoryService.requireAccessibleRepository(platform, repositoryId, session);
+        IssueCache issue = issueService.requireIssue(platform, repositoryId, issueNumberOrKey, session);
+        String accessToken = authService.requirePlatformAccessToken(platform, session);
+        List<RemoteComment> comments = platformGatewayResolver.getGateway(platform).getIssueComments(
+            accessToken,
             repository.getOwnerKey(),
             repository.getName(),
-            issueNumber.toString()
+            issueNumberOrKey
         );
         comments.forEach(comment -> upsertComment(issue, comment));
 
         syncStateService.recordSuccess(
             SyncResourceType.COMMENT_LIST,
-            issue.getExternalId(),
+            platform.name() + ":" + issue.getExternalId(),
             "Comment cache refreshed."
         );
 
-        return getComments(githubRepositoryId, issueNumber, session);
+        return getComments(platform, repositoryId, issueNumberOrKey, session);
     }
 
     @Transactional
-    public CommentResponse createComment(Long githubRepositoryId, Integer issueNumber, CreateCommentRequest request, HttpSession session) {
-        var repository = repositoryService.requireAccessibleRepository(githubRepositoryId, session);
-        IssueCache issue = issueService.requireIssue(githubRepositoryId, issueNumber, session);
-        String personalAccessToken = authService.requirePersonalAccessToken(session);
-        RemoteComment createdComment = platformGatewayResolver.getGateway(PlatformType.GITHUB).createComment(
-            personalAccessToken,
+    public CommentResponse createComment(
+        PlatformType platform,
+        String repositoryId,
+        String issueNumberOrKey,
+        CreateCommentRequest request,
+        HttpSession session
+    ) {
+        var repository = repositoryService.requireAccessibleRepository(platform, repositoryId, session);
+        IssueCache issue = issueService.requireIssue(platform, repositoryId, issueNumberOrKey, session);
+        String accessToken = authService.requirePlatformAccessToken(platform, session);
+        RemoteComment createdComment = platformGatewayResolver.getGateway(platform).createComment(
+            accessToken,
             repository.getOwnerKey(),
             repository.getName(),
-            issueNumber.toString(),
+            issueNumberOrKey,
             request.body()
         );
         CommentCache comment = upsertComment(issue, createdComment);
 
         syncStateService.recordSuccess(
             SyncResourceType.COMMENT_LIST,
-            issue.getExternalId(),
+            platform.name() + ":" + issue.getExternalId(),
             "Comment created in cache."
         );
 
@@ -100,14 +103,11 @@ public class CommentService {
     }
 
     private CommentCache upsertComment(IssueCache issue, RemoteComment commentInfo) {
-        return commentCacheRepository.findByPlatformAndIssueExternalIdOrderByCreatedAtAsc(
-                PlatformType.GITHUB,
-                issue.getExternalId()
-            ).stream()
+        return commentCacheRepository.findByPlatformAndIssueExternalIdOrderByCreatedAtAsc(issue.getPlatform(), issue.getExternalId()).stream()
             .filter(existing -> existing.getExternalId().equals(commentInfo.externalId()))
             .findFirst()
             .orElseGet(() -> commentCacheRepository.save(new CommentCache(
-                PlatformType.GITHUB,
+                issue.getPlatform(),
                 commentInfo.externalId(),
                 issue.getExternalId(),
                 commentInfo.authorLogin(),
@@ -120,7 +120,8 @@ public class CommentService {
 
     private CommentResponse toResponse(CommentCache comment) {
         return new CommentResponse(
-            Long.parseLong(comment.getExternalId()),
+            comment.getPlatform(),
+            comment.getExternalId(),
             comment.getAuthorLogin(),
             comment.getBody(),
             comment.getCreatedAt(),

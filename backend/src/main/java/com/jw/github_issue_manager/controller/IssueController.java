@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.dto.issue.CreateIssueRequest;
 import com.jw.github_issue_manager.dto.issue.IssueDetailResponse;
 import com.jw.github_issue_manager.dto.issue.IssueSummaryResponse;
@@ -24,7 +25,7 @@ import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/api/repositories/{repositoryId}/issues")
+@RequestMapping("/api/platforms/{platform}/repositories/{repositoryId}/issues")
 public class IssueController {
 
     private final IssueService issueService;
@@ -35,63 +36,73 @@ public class IssueController {
 
     @GetMapping
     public ResponseEntity<List<IssueSummaryResponse>> getIssues(
-        @PathVariable Long repositoryId,
+        @PathVariable String platform,
+        @PathVariable String repositoryId,
         @RequestParam(required = false) String keyword,
         @RequestParam(required = false) String state,
         HttpSession session
     ) {
-        return ResponseEntity.ok(issueService.getIssues(repositoryId, keyword, state, session));
+        return ResponseEntity.ok(issueService.getIssues(PlatformType.from(platform), repositoryId, keyword, state, session));
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<List<IssueSummaryResponse>> refreshIssues(@PathVariable Long repositoryId, HttpSession session) {
-        return ResponseEntity.ok(issueService.refreshIssues(repositoryId, session));
+    public ResponseEntity<List<IssueSummaryResponse>> refreshIssues(
+        @PathVariable String platform,
+        @PathVariable String repositoryId,
+        HttpSession session
+    ) {
+        return ResponseEntity.ok(issueService.refreshIssues(PlatformType.from(platform), repositoryId, session));
     }
 
     @PostMapping
     public ResponseEntity<IssueDetailResponse> createIssue(
-        @PathVariable Long repositoryId,
+        @PathVariable String platform,
+        @PathVariable String repositoryId,
         @Valid @RequestBody CreateIssueRequest request,
         HttpSession session
     ) {
-        return ResponseEntity.ok(issueService.createIssue(repositoryId, request, session));
+        return ResponseEntity.ok(issueService.createIssue(PlatformType.from(platform), repositoryId, request, session));
     }
 
-    @GetMapping("/{issueNumber}")
+    @GetMapping("/{issueNumberOrKey}")
     public ResponseEntity<IssueDetailResponse> getIssue(
-        @PathVariable Long repositoryId,
-        @PathVariable Integer issueNumber,
+        @PathVariable String platform,
+        @PathVariable String repositoryId,
+        @PathVariable String issueNumberOrKey,
         HttpSession session
     ) {
-        return ResponseEntity.ok(issueService.getIssue(repositoryId, issueNumber, session));
+        return ResponseEntity.ok(issueService.getIssue(PlatformType.from(platform), repositoryId, issueNumberOrKey, session));
     }
 
-    @PatchMapping("/{issueNumber}")
+    @PatchMapping("/{issueNumberOrKey}")
     public ResponseEntity<IssueDetailResponse> updateIssue(
-        @PathVariable Long repositoryId,
-        @PathVariable Integer issueNumber,
+        @PathVariable String platform,
+        @PathVariable String repositoryId,
+        @PathVariable String issueNumberOrKey,
         @RequestBody UpdateIssueRequest request,
         HttpSession session
     ) {
-        return ResponseEntity.ok(issueService.updateIssue(repositoryId, issueNumber, request, session));
+        return ResponseEntity.ok(issueService.updateIssue(PlatformType.from(platform), repositoryId, issueNumberOrKey, request, session));
     }
 
-    @DeleteMapping("/{issueNumber}")
+    @DeleteMapping("/{issueNumberOrKey}")
     public ResponseEntity<Void> deleteIssue(
-        @PathVariable Long repositoryId,
-        @PathVariable Integer issueNumber,
+        @PathVariable String platform,
+        @PathVariable String repositoryId,
+        @PathVariable String issueNumberOrKey,
         HttpSession session
     ) {
-        issueService.deleteIssue(repositoryId, issueNumber, session);
+        issueService.deleteIssue(PlatformType.from(platform), repositoryId, issueNumberOrKey, session);
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/{issueNumber}/sync-state")
+    @GetMapping("/{issueNumberOrKey}/sync-state")
     public ResponseEntity<SyncStateResponse> getIssueSyncState(
-        @PathVariable Long repositoryId,
-        @PathVariable Integer issueNumber,
+        @PathVariable String platform,
+        @PathVariable String repositoryId,
+        @PathVariable String issueNumberOrKey,
         HttpSession session
     ) {
-        return ResponseEntity.ok(issueService.getIssueSyncState(repositoryId, issueNumber, session));
+        return ResponseEntity.ok(issueService.getIssueSyncState(PlatformType.from(platform), repositoryId, issueNumberOrKey, session));
     }
 }

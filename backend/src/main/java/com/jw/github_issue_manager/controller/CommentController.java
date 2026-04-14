@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.dto.comment.CommentResponse;
 import com.jw.github_issue_manager.dto.comment.CreateCommentRequest;
 import com.jw.github_issue_manager.service.CommentService;
@@ -18,7 +19,7 @@ import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/api/repositories/{repositoryId}/issues/{issueNumber}/comments")
+@RequestMapping("/api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}/comments")
 public class CommentController {
 
     private final CommentService commentService;
@@ -29,29 +30,32 @@ public class CommentController {
 
     @GetMapping
     public ResponseEntity<List<CommentResponse>> getComments(
-        @PathVariable Long repositoryId,
-        @PathVariable Integer issueNumber,
+        @PathVariable String platform,
+        @PathVariable String repositoryId,
+        @PathVariable String issueNumberOrKey,
         HttpSession session
     ) {
-        return ResponseEntity.ok(commentService.getComments(repositoryId, issueNumber, session));
+        return ResponseEntity.ok(commentService.getComments(PlatformType.from(platform), repositoryId, issueNumberOrKey, session));
     }
 
     @PostMapping("/refresh")
     public ResponseEntity<List<CommentResponse>> refreshComments(
-        @PathVariable Long repositoryId,
-        @PathVariable Integer issueNumber,
+        @PathVariable String platform,
+        @PathVariable String repositoryId,
+        @PathVariable String issueNumberOrKey,
         HttpSession session
     ) {
-        return ResponseEntity.ok(commentService.refreshComments(repositoryId, issueNumber, session));
+        return ResponseEntity.ok(commentService.refreshComments(PlatformType.from(platform), repositoryId, issueNumberOrKey, session));
     }
 
     @PostMapping
     public ResponseEntity<CommentResponse> createComment(
-        @PathVariable Long repositoryId,
-        @PathVariable Integer issueNumber,
+        @PathVariable String platform,
+        @PathVariable String repositoryId,
+        @PathVariable String issueNumberOrKey,
         @Valid @RequestBody CreateCommentRequest request,
         HttpSession session
     ) {
-        return ResponseEntity.ok(commentService.createComment(repositoryId, issueNumber, request, session));
+        return ResponseEntity.ok(commentService.createComment(PlatformType.from(platform), repositoryId, issueNumberOrKey, request, session));
     }
 }

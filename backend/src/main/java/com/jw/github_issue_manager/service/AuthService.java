@@ -10,10 +10,10 @@ import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.core.remote.RemoteUserProfile;
 import com.jw.github_issue_manager.domain.PlatformConnection;
 import com.jw.github_issue_manager.domain.User;
-import com.jw.github_issue_manager.dto.auth.GitHubAccountResponse;
-import com.jw.github_issue_manager.dto.auth.GitHubTokenStatusResponse;
 import com.jw.github_issue_manager.dto.auth.MeResponse;
-import com.jw.github_issue_manager.dto.auth.RegisterGitHubTokenRequest;
+import com.jw.github_issue_manager.dto.auth.PlatformConnectionResponse;
+import com.jw.github_issue_manager.dto.auth.PlatformTokenStatusResponse;
+import com.jw.github_issue_manager.dto.auth.RegisterPlatformTokenRequest;
 import com.jw.github_issue_manager.exception.UnauthorizedException;
 import com.jw.github_issue_manager.repository.PlatformConnectionRepository;
 import com.jw.github_issue_manager.repository.UserRepository;
@@ -24,6 +24,7 @@ import jakarta.servlet.http.HttpSession;
 public class AuthService {
 
     public static final String CURRENT_USER_ID = "currentUserId";
+    public static final String CURRENT_PLATFORM = "currentPlatform";
 
     private final UserRepository userRepository;
     private final PlatformConnectionRepository platformConnectionRepository;
@@ -43,58 +44,66 @@ public class AuthService {
     }
 
     @Transactional
-    public MeResponse registerGitHubToken(RegisterGitHubTokenRequest request, HttpSession session) {
-        RemoteUserProfile userProfile = platformGatewayResolver.getGateway(PlatformType.GITHUB)
+    public MeResponse registerPlatformToken(PlatformType platform, RegisterPlatformTokenRequest request, HttpSession session) {
+        RemoteUserProfile userProfile = platformGatewayResolver.getGateway(platform)
             .getAuthenticatedUser(request.accessToken());
         String encryptedToken = patCryptoService.encrypt(request.accessToken());
         LocalDateTime now = LocalDateTime.now();
-        PlatformConnection account = platformConnectionRepository.findByPlatformAndExternalUserId(
-                PlatformType.GITHUB,
+        PlatformConnection connection = platformConnectionRepository.findByPlatformAndExternalUserId(
+                platform,
                 userProfile.externalUserId()
             )
-            .map(existing -> updateExistingAccount(existing, userProfile, encryptedToken, now))
-            .orElseGet(() -> createAccount(userProfile, encryptedToken, now));
+            .map(existing -> updateExistingConnection(existing, userProfile, encryptedToken, now))
+            .orElseGet(() -> createConnection(platform, userProfile, encryptedToken, now));
 
-        account.touchAuthentication();
-        session.setAttribute(CURRENT_USER_ID, account.getUser().getId());
-        return toMeResponse(account);
+        connection.touchAuthentication();
+        session.setAttribute(CURRENT_USER_ID, connection.getUser().getId());
+        session.setAttribute(CURRENT_PLATFORM, platform.name());
+        return toMeResponse(connection);
     }
 
     @Transactional(readOnly = true)
     public MeResponse getCurrentUser(HttpSession session) {
-        return toMeResponse(requireCurrentAccount(session));
+        return toMeResponse(requireCurrentConnection(requireCurrentPlatform(session), session));
     }
 
     @Transactional(readOnly = true)
-    public GitHubAccountResponse getCurrentGitHubAccount(HttpSession session) {
-        PlatformConnection account = requireCurrentAccount(session);
-        return new GitHubAccountResponse(
-            Long.parseLong(account.getExternalUserId()),
-            account.getAccountLogin(),
-            account.getAvatarUrl(),
-            account.getTokenScopes(),
-            account.getConnectedAt(),
-            account.getLastAuthenticatedAt()
+    public PlatformConnectionResponse getCurrentPlatformConnection(PlatformType platform, HttpSession session) {
+        PlatformConnection connection = requireCurrentConnection(platform, session);
+        return new PlatformConnectionResponse(
+            connection.getPlatform(),
+            connection.getExternalUserId(),
+            connection.getAccountLogin(),
+            connection.getAvatarUrl(),
+            connection.getTokenScopes(),
+            connection.getConnectedAt(),
+            connection.getLastAuthenticatedAt()
         );
     }
 
     @Transactional(readOnly = true)
-    public GitHubTokenStatusResponse getGitHubTokenStatus(HttpSession session) {
-        PlatformConnection account = requireCurrentAccount(session);
-        return new GitHubTokenStatusResponse(
-            account.getAccessTokenEncrypted() != null && !account.getAccessTokenEncrypted().isBlank(),
-            account.getAccountLogin(),
-            account.getTokenScopes(),
-            account.getTokenVerifiedAt()
+    public PlatformTokenStatusResponse getPlatformTokenStatus(PlatformType platform, HttpSession session) {
+        PlatformConnection connection = requireCurrentConnection(platform, session);
+        return new PlatformTokenStatusResponse(
+            connection.getPlatform(),
+            connection.getAccessTokenEncrypted() != null && !connection.getAccessTokenEncrypted().isBlank(),
+            connection.getAccountLogin(),
+            connection.getTokenScopes(),
+            connection.getTokenVerifiedAt()
         );
     }
 
     @Transactional
-    public void disconnectGitHubToken(HttpSession session) {
-        PlatformConnection account = requireCurrentAccount(session);
-        account.setAccessTokenEncrypted(null);
-        account.setTokenScopes(null);
-        session.removeAttribute(CURRENT_USER_ID);
+    public void disconnectPlatformToken(PlatformType platform, HttpSession session) {
+        PlatformConnection connection = requireCurrentConnection(platform, session);
+        connection.setAccessTokenEncrypted(null);
+        connection.setTokenScopes(null);
+
+        Object currentPlatform = session.getAttribute(CURRENT_PLATFORM);
+        if (platform.name().equals(currentPlatform)) {
+            session.removeAttribute(CURRENT_PLATFORM);
+            session.removeAttribute(CURRENT_USER_ID);
+        }
     }
 
     public void logout(HttpSession session) {
@@ -102,54 +111,67 @@ public class AuthService {
     }
 
     @Transactional(readOnly = true)
-    public PlatformConnection requireCurrentAccount(HttpSession session) {
+    public PlatformConnection requireCurrentConnection(PlatformType platform, HttpSession session) {
         Object currentUserId = session.getAttribute(CURRENT_USER_ID);
         if (!(currentUserId instanceof Long userId)) {
-            throw new UnauthorizedException("GitHub login is required.");
+            throw new UnauthorizedException(platform.name() + " login is required.");
         }
 
-        return platformConnectionRepository.findByPlatformAndUserId(PlatformType.GITHUB, userId)
-            .orElseThrow(() -> new UnauthorizedException("Connected GitHub account was not found."));
+        return platformConnectionRepository.findByPlatformAndUserId(platform, userId)
+            .orElseThrow(() -> new UnauthorizedException("Connected " + platform.name() + " account was not found."));
     }
 
-    public String requirePersonalAccessToken(HttpSession session) {
-        PlatformConnection account = requireCurrentAccount(session);
-        if (account.getAccessTokenEncrypted() == null || account.getAccessTokenEncrypted().isBlank()) {
-            throw new UnauthorizedException("GitHub personal access token is not connected.");
+    public String requirePlatformAccessToken(PlatformType platform, HttpSession session) {
+        PlatformConnection connection = requireCurrentConnection(platform, session);
+        if (connection.getAccessTokenEncrypted() == null || connection.getAccessTokenEncrypted().isBlank()) {
+            throw new UnauthorizedException(platform.name() + " personal access token is not connected.");
         }
-        return patCryptoService.decrypt(account.getAccessTokenEncrypted());
+        return patCryptoService.decrypt(connection.getAccessTokenEncrypted());
     }
 
-    private PlatformConnection updateExistingAccount(
-        PlatformConnection account,
+    public PlatformType requireCurrentPlatform(HttpSession session) {
+        Object currentPlatform = session.getAttribute(CURRENT_PLATFORM);
+        if (currentPlatform instanceof String platform) {
+            return PlatformType.from(platform);
+        }
+        return PlatformType.GITHUB;
+    }
+
+    private PlatformConnection updateExistingConnection(
+        PlatformConnection connection,
         RemoteUserProfile userProfile,
         String encryptedToken,
         LocalDateTime verifiedAt
     ) {
-        User user = account.getUser();
+        User user = connection.getUser();
         user.setDisplayName(resolveDisplayName(userProfile));
         user.setEmail(userProfile.email());
-        account.setAccountLogin(userProfile.login());
-        account.setAvatarUrl(userProfile.avatarUrl());
-        account.setTokenScopes("fine-grained");
-        account.setAccessTokenEncrypted(encryptedToken);
-        account.markTokenVerified(verifiedAt);
-        return account;
+        connection.setAccountLogin(userProfile.login());
+        connection.setAvatarUrl(userProfile.avatarUrl());
+        connection.setTokenScopes("fine-grained");
+        connection.setAccessTokenEncrypted(encryptedToken);
+        connection.markTokenVerified(verifiedAt);
+        return connection;
     }
 
-    private PlatformConnection createAccount(RemoteUserProfile userProfile, String encryptedToken, LocalDateTime verifiedAt) {
+    private PlatformConnection createConnection(
+        PlatformType platform,
+        RemoteUserProfile userProfile,
+        String encryptedToken,
+        LocalDateTime verifiedAt
+    ) {
         User user = userRepository.save(new User(resolveDisplayName(userProfile), userProfile.email()));
-        PlatformConnection account = new PlatformConnection(
+        PlatformConnection connection = new PlatformConnection(
             user,
-            PlatformType.GITHUB,
+            platform,
             userProfile.externalUserId(),
             userProfile.login(),
             userProfile.avatarUrl(),
             encryptedToken,
             "fine-grained"
         );
-        account.markTokenVerified(verifiedAt);
-        return platformConnectionRepository.save(account);
+        connection.markTokenVerified(verifiedAt);
+        return platformConnectionRepository.save(connection);
     }
 
     private String resolveDisplayName(RemoteUserProfile userProfile) {
@@ -158,12 +180,13 @@ public class AuthService {
             : userProfile.displayName();
     }
 
-    private MeResponse toMeResponse(PlatformConnection account) {
+    private MeResponse toMeResponse(PlatformConnection connection) {
         return new MeResponse(
-            account.getUser().getId(),
-            account.getUser().getDisplayName(),
-            account.getAccountLogin(),
-            account.getAvatarUrl()
+            connection.getUser().getId(),
+            connection.getUser().getDisplayName(),
+            connection.getPlatform(),
+            connection.getAccountLogin(),
+            connection.getAvatarUrl()
         );
     }
 }

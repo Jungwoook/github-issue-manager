@@ -83,9 +83,6 @@ public class PlatformConnection {
         LocalDateTime now = LocalDateTime.now();
         connectedAt = now;
         lastAuthenticatedAt = now;
-        if (platform == null) {
-            platform = PlatformType.GITHUB;
-        }
     }
 
     public void touchAuthentication() {

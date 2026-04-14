@@ -1,16 +1,18 @@
 package com.jw.github_issue_manager.controller;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.jw.github_issue_manager.dto.auth.GitHubTokenStatusResponse;
+import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.dto.auth.MeResponse;
-import com.jw.github_issue_manager.dto.auth.RegisterGitHubTokenRequest;
+import com.jw.github_issue_manager.dto.auth.PlatformTokenStatusResponse;
+import com.jw.github_issue_manager.dto.auth.RegisterPlatformTokenRequest;
 import com.jw.github_issue_manager.service.AuthService;
 
 import jakarta.servlet.http.HttpSession;
@@ -26,22 +28,23 @@ public class AuthController {
         this.authService = authService;
     }
 
-    @PostMapping("/github/token")
+    @PostMapping("/platforms/{platform}/token")
     public ResponseEntity<MeResponse> registerToken(
-        @Valid @RequestBody RegisterGitHubTokenRequest request,
+        @PathVariable String platform,
+        @Valid @RequestBody RegisterPlatformTokenRequest request,
         HttpSession session
     ) {
-        return ResponseEntity.ok(authService.registerGitHubToken(request, session));
+        return ResponseEntity.ok(authService.registerPlatformToken(PlatformType.from(platform), request, session));
     }
 
-    @GetMapping("/github/token/status")
-    public ResponseEntity<GitHubTokenStatusResponse> tokenStatus(HttpSession session) {
-        return ResponseEntity.ok(authService.getGitHubTokenStatus(session));
+    @GetMapping("/platforms/{platform}/token/status")
+    public ResponseEntity<PlatformTokenStatusResponse> tokenStatus(@PathVariable String platform, HttpSession session) {
+        return ResponseEntity.ok(authService.getPlatformTokenStatus(PlatformType.from(platform), session));
     }
 
-    @DeleteMapping("/github/token")
-    public ResponseEntity<Void> disconnectToken(HttpSession session) {
-        authService.disconnectGitHubToken(session);
+    @DeleteMapping("/platforms/{platform}/token")
+    public ResponseEntity<Void> disconnectToken(@PathVariable String platform, HttpSession session) {
+        authService.disconnectPlatformToken(PlatformType.from(platform), session);
         return ResponseEntity.noContent().build();
     }
 
