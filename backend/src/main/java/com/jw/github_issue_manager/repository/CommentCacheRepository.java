@@ -13,6 +13,8 @@ public interface CommentCacheRepository extends JpaRepository<CommentCache, Long
 
     List<CommentCache> findByPlatformAndIssueExternalIdOrderByCreatedAtAsc(PlatformType platform, String issueExternalId);
 
+    java.util.Optional<CommentCache> findByPlatformAndExternalId(PlatformType platform, String externalId);
+
     @Query("""
         select coalesce(max(cast(c.externalId as integer)), 0)
         from CommentCache c

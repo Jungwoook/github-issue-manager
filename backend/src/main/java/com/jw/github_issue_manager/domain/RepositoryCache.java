@@ -25,10 +25,10 @@ public class RepositoryCache {
     @Column(nullable = false)
     private PlatformType platform;
 
-    @Column(name = "github_repository_id", nullable = false, unique = true)
+    @Column(name = "external_id", nullable = false, unique = true)
     private String externalId;
 
-    @Column(name = "owner_login", nullable = false)
+    @Column(name = "owner_key", nullable = false)
     private String ownerKey;
 
     @Column(nullable = false)
@@ -43,7 +43,7 @@ public class RepositoryCache {
     @Column(nullable = false)
     private boolean isPrivate;
 
-    @Column(name = "html_url", nullable = false)
+    @Column(name = "web_url", nullable = false)
     private String webUrl;
 
     @Column(nullable = false)
