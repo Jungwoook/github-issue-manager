@@ -1,5 +1,6 @@
 export interface Comment {
-  githubCommentId: number;
+  platform: string;
+  commentId: string;
   authorLogin: string;
   body: string;
   createdAt: string;

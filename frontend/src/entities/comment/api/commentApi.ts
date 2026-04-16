@@ -1,13 +1,14 @@
 import { apiRequest } from '@/shared/api/client';
+import { DEFAULT_PLATFORM, withPlatform } from '@/shared/constants/platform';
 
 import type { Comment, CreateCommentPayload } from '@/entities/comment/model/types';
 
 export function getComments(repositoryId: number | string, issueId: number | string) {
-  return apiRequest<Comment[]>(`/repositories/${repositoryId}/issues/${issueId}/comments`);
+  return apiRequest<Comment[]>(withPlatform(`/repositories/${repositoryId}/issues/${issueId}/comments`, DEFAULT_PLATFORM));
 }
 
 export function refreshComments(repositoryId: number | string, issueId: number | string) {
-  return apiRequest<Comment[]>(`/repositories/${repositoryId}/issues/${issueId}/comments/refresh`, {
+  return apiRequest<Comment[]>(withPlatform(`/repositories/${repositoryId}/issues/${issueId}/comments/refresh`, DEFAULT_PLATFORM), {
     method: 'POST',
   });
 }
@@ -17,7 +18,7 @@ export function createComment(
   issueId: number | string,
   payload: CreateCommentPayload,
 ) {
-  return apiRequest<Comment>(`/repositories/${repositoryId}/issues/${issueId}/comments`, {
+  return apiRequest<Comment>(withPlatform(`/repositories/${repositoryId}/issues/${issueId}/comments`, DEFAULT_PLATFORM), {
     method: 'POST',
     body: JSON.stringify(payload),
   });

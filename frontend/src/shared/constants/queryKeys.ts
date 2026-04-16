@@ -1,14 +1,14 @@
 export const queryKeys = {
-  githubTokenStatus: ['github-token-status'] as const,
-  repositories: ['repositories'] as const,
-  repository: (repositoryId: number | string) => ['repository', repositoryId] as const,
-  issuesRoot: (repositoryId: number | string) => ['issues', repositoryId] as const,
-  issues: (repositoryId: number | string, filters?: unknown) =>
-    ['issues', repositoryId, filters ?? {}] as const,
-  issue: (repositoryId: number | string, issueId: number | string) =>
-    ['issue', repositoryId, issueId] as const,
+  platformTokenStatus: (platform: string) => ['platform-token-status', platform] as const,
+  repositories: (platform: string) => ['repositories', platform] as const,
+  repository: (platform: string, repositoryId: number | string) => ['repository', platform, repositoryId] as const,
+  issuesRoot: (platform: string, repositoryId: number | string) => ['issues', platform, repositoryId] as const,
+  issues: (platform: string, repositoryId: number | string, filters?: unknown) =>
+    ['issues', platform, repositoryId, filters ?? {}] as const,
+  issue: (platform: string, repositoryId: number | string, issueId: number | string) =>
+    ['issue', platform, repositoryId, issueId] as const,
   users: (filters?: unknown) => ['users', filters ?? {}] as const,
-  labels: (repositoryId: number | string) => ['labels', repositoryId] as const,
-  comments: (repositoryId: number | string, issueId: number | string) =>
-    ['comments', repositoryId, issueId] as const,
+  labels: (platform: string, repositoryId: number | string) => ['labels', platform, repositoryId] as const,
+  comments: (platform: string, repositoryId: number | string, issueId: number | string) =>
+    ['comments', platform, repositoryId, issueId] as const,
 };

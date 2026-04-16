@@ -1,12 +1,12 @@
-export type IssueStatus = 'OPEN' | 'CLOSED';
+export type IssueState = 'OPEN' | 'CLOSED';
 export type IssuePriority = 'LOW' | 'MEDIUM' | 'HIGH';
 
 export interface IssueSummary {
-  githubIssueId: number;
-  number: number;
+  platform: string;
+  issueId: string;
+  numberOrKey: string;
   title: string;
-  status: IssueStatus;
-  priority: IssuePriority;
+  state: IssueState;
   authorLogin: string | null;
   createdAt: string;
   updatedAt: string;
@@ -14,14 +14,14 @@ export interface IssueSummary {
 }
 
 export interface IssueDetail extends IssueSummary {
-  githubRepositoryId: number;
+  repositoryId: string;
   body: string | null;
   closedAt: string | null;
 }
 
 export interface IssueFilter {
   keyword?: string;
-  state?: IssueStatus;
+  state?: IssueState;
 }
 
 export interface CreateIssuePayload {
@@ -32,5 +32,5 @@ export interface CreateIssuePayload {
 export interface UpdateIssuePayload {
   title?: string;
   body?: string;
-  state?: IssueStatus;
+  state?: IssueState;
 }

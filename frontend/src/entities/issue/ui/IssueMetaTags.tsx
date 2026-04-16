@@ -1,19 +1,19 @@
-import type { IssueStatus } from '@/entities/issue/model/types';
+import type { IssueState } from '@/entities/issue/model/types';
 
 interface IssueMetaTagsProps {
-  status: IssueStatus;
+  state: IssueState;
 }
 
-function toStatusClass(status: IssueStatus) {
-  return status === 'OPEN' ? 'status-open' : 'status-closed';
+function toStatusClass(state: IssueState) {
+  return state === 'OPEN' ? 'status-open' : 'status-closed';
 }
 
-export function IssueMetaTags({ status }: IssueMetaTagsProps) {
-  const statusLabel = status === 'OPEN' ? '열림' : '닫힘';
+export function IssueMetaTags({ state }: IssueMetaTagsProps) {
+  const statusLabel = state === 'OPEN' ? '열림' : '닫힘';
 
   return (
     <div className="tag-row">
-      <span className={`tag ${toStatusClass(status)}`}>{statusLabel}</span>
+      <span className={`tag ${toStatusClass(state)}`}>{statusLabel}</span>
     </div>
   );
 }

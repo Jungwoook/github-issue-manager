@@ -4,11 +4,9 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { getGitHubTokenStatus } from '@/entities/github/api/githubTokenApi';
-import {
-  getRepositories,
-  refreshRepositories,
-} from '@/entities/repository/api/repositoryApi';
+import { getRepositories, refreshRepositories } from '@/entities/repository/api/repositoryApi';
 import type { Repository } from '@/entities/repository/model/types';
+import { DEFAULT_PLATFORM } from '@/shared/constants/platform';
 import { queryKeys } from '@/shared/constants/queryKeys';
 import { formatDate } from '@/shared/lib/formatDate';
 import { getErrorMessage } from '@/shared/lib/getErrorMessage';
@@ -21,13 +19,13 @@ export function RepositoryListWidget() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const tokenStatusQuery = useQuery({
-    queryKey: queryKeys.githubTokenStatus,
+    queryKey: queryKeys.platformTokenStatus(DEFAULT_PLATFORM),
     queryFn: getGitHubTokenStatus,
     retry: false,
   });
 
   const repositoryQuery = useQuery({
-    queryKey: queryKeys.repositories,
+    queryKey: queryKeys.repositories(DEFAULT_PLATFORM),
     queryFn: getRepositories,
   });
 
@@ -36,13 +34,13 @@ export function RepositoryListWidget() {
     onSuccess: async () => {
       setHasAutoRefreshed(true);
       setCurrentPage(1);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.repositories });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.repositories(DEFAULT_PLATFORM) });
     },
   });
 
   const repositories = repositoryQuery.data ?? [];
   const tokenConnected = tokenStatusQuery.data?.connected ?? false;
-  const connectedOwners = new Set(repositories.map((repository) => repository.ownerLogin)).size;
+  const connectedOwners = new Set(repositories.map((repository) => repository.ownerKey)).size;
   const privateRepositoryCount = repositories.filter((repository) => repository.private).length;
   const submitError = refreshMutation.error;
   const totalPages = Math.max(1, Math.ceil(repositories.length / PAGE_SIZE));
@@ -78,7 +76,7 @@ export function RepositoryListWidget() {
     <div className="page-stack">
       <section className="stats-grid">
         <article className="stat-card">
-          <p className="muted">조회한 저장소</p>
+          <p className="muted">조회된 저장소</p>
           <p className="stat-card-value">{repositories.length}</p>
         </article>
         <article className="stat-card">
@@ -114,9 +112,7 @@ export function RepositoryListWidget() {
         ) : null}
         {repositoryQuery.isLoading ? <div className="info-banner">저장소를 불러오는 중입니다...</div> : null}
         {repositoryQuery.isError ? (
-          <div className="error-banner">
-            저장소를 불러오지 못했습니다. {getErrorMessage(repositoryQuery.error)}
-          </div>
+          <div className="error-banner">저장소를 불러오지 못했습니다. {getErrorMessage(repositoryQuery.error)}</div>
         ) : null}
         {submitError ? <div className="error-banner">{getErrorMessage(submitError)}</div> : null}
         {refreshMutation.isSuccess ? (
@@ -133,7 +129,7 @@ export function RepositoryListWidget() {
           <>
             <div className="repository-list">
               {visibleRepositories.map((repository) => (
-                <RepositoryListItem key={repository.githubRepositoryId} repository={repository} />
+                <RepositoryListItem key={repository.repositoryId} repository={repository} />
               ))}
             </div>
 
@@ -177,7 +173,7 @@ function RepositoryListItem({ repository }: { repository: Repository }) {
         <div className="repository-list-header">
           <div className="stack-sm">
             <div className="repository-title-row">
-              <Link className="issue-title-link" to={`/repositories/${repository.githubRepositoryId}/issues`}>
+              <Link className="issue-title-link" to={`/repositories/${repository.repositoryId}/issues`}>
                 {repository.fullName}
               </Link>
               <span className={`tag ${repository.private ? 'priority-high' : 'priority-low'}`}>
@@ -188,12 +184,12 @@ function RepositoryListItem({ repository }: { repository: Repository }) {
           </div>
 
           <div className="repository-actions">
-            <Link className="button" to={`/repositories/${repository.githubRepositoryId}/issues`}>
-              이슈보기
+            <Link className="button" to={`/repositories/${repository.repositoryId}/issues`}>
+              이슈 보기
             </Link>
             <a
               className="button button-ghost"
-              href={repository.htmlUrl}
+              href={repository.webUrl}
               target="_blank"
               rel="noreferrer"
             >

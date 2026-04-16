@@ -1,19 +1,21 @@
 import { apiRequest } from '@/shared/api/client';
+import { DEFAULT_PLATFORM, withPlatform } from '@/shared/constants/platform';
 
 import type {
   CreateIssuePayload,
   IssueDetail,
   IssueFilter,
   IssueSummary,
-  IssueStatus,
+  IssueState,
   UpdateIssuePayload,
 } from '@/entities/issue/model/types';
 
 interface IssueSummaryResponse {
-  githubIssueId: number;
-  number: number;
+  platform: string;
+  issueId: string;
+  numberOrKey: string;
   title: string;
-  state: IssueStatus;
+  state: IssueState;
   authorLogin: string | null;
   createdAt: string;
   updatedAt: string;
@@ -21,18 +23,18 @@ interface IssueSummaryResponse {
 }
 
 interface IssueDetailResponse extends IssueSummaryResponse {
-  githubRepositoryId: number;
+  repositoryId: string;
   body: string | null;
   closedAt: string | null;
 }
 
 function mapIssueSummary(issue: IssueSummaryResponse): IssueSummary {
   return {
-    githubIssueId: issue.githubIssueId,
-    number: issue.number,
+    platform: issue.platform,
+    issueId: issue.issueId,
+    numberOrKey: issue.numberOrKey,
     title: issue.title,
-    status: issue.state,
-    priority: issue.state === 'OPEN' ? 'MEDIUM' : 'LOW',
+    state: issue.state,
     authorLogin: issue.authorLogin,
     createdAt: issue.createdAt,
     updatedAt: issue.updatedAt,
@@ -43,35 +45,39 @@ function mapIssueSummary(issue: IssueSummaryResponse): IssueSummary {
 function mapIssueDetail(issue: IssueDetailResponse): IssueDetail {
   return {
     ...mapIssueSummary(issue),
-    githubRepositoryId: issue.githubRepositoryId,
+    repositoryId: issue.repositoryId,
     body: issue.body,
     closedAt: issue.closedAt,
   };
 }
 
 export async function getIssues(repositoryId: number | string, filters: IssueFilter = {}) {
-  const issues = await apiRequest<IssueSummaryResponse[]>(`/repositories/${repositoryId}/issues`, {
-    query: filters,
-  });
+  const issues = await apiRequest<IssueSummaryResponse[]>(
+    withPlatform(`/repositories/${repositoryId}/issues`, DEFAULT_PLATFORM),
+    { query: filters },
+  );
 
   return issues.map(mapIssueSummary);
 }
 
 export async function refreshIssues(repositoryId: number | string) {
-  const issues = await apiRequest<IssueSummaryResponse[]>(`/repositories/${repositoryId}/issues/refresh`, {
-    method: 'POST',
-  });
+  const issues = await apiRequest<IssueSummaryResponse[]>(
+    withPlatform(`/repositories/${repositoryId}/issues/refresh`, DEFAULT_PLATFORM),
+    { method: 'POST' },
+  );
 
   return issues.map(mapIssueSummary);
 }
 
 export async function getIssueDetail(repositoryId: number | string, issueId: number | string) {
-  const issue = await apiRequest<IssueDetailResponse>(`/repositories/${repositoryId}/issues/${issueId}`);
+  const issue = await apiRequest<IssueDetailResponse>(
+    withPlatform(`/repositories/${repositoryId}/issues/${issueId}`, DEFAULT_PLATFORM),
+  );
   return mapIssueDetail(issue);
 }
 
 export async function createIssue(repositoryId: number | string, payload: CreateIssuePayload) {
-  const issue = await apiRequest<IssueDetailResponse>(`/repositories/${repositoryId}/issues`, {
+  const issue = await apiRequest<IssueDetailResponse>(withPlatform(`/repositories/${repositoryId}/issues`, DEFAULT_PLATFORM), {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -84,7 +90,7 @@ export async function updateIssue(
   issueId: number | string,
   payload: UpdateIssuePayload,
 ) {
-  const issue = await apiRequest<IssueDetailResponse>(`/repositories/${repositoryId}/issues/${issueId}`, {
+  const issue = await apiRequest<IssueDetailResponse>(withPlatform(`/repositories/${repositoryId}/issues/${issueId}`, DEFAULT_PLATFORM), {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
@@ -93,7 +99,7 @@ export async function updateIssue(
 }
 
 export function deleteIssue(repositoryId: number | string, issueId: number | string) {
-  return apiRequest<void>(`/repositories/${repositoryId}/issues/${issueId}`, {
+  return apiRequest<void>(withPlatform(`/repositories/${repositoryId}/issues/${issueId}`, DEFAULT_PLATFORM), {
     method: 'DELETE',
   });
 }

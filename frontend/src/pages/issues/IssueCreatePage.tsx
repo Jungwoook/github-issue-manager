@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { createIssue } from '@/entities/issue/api/issueApi';
+import { DEFAULT_PLATFORM } from '@/shared/constants/platform';
 import { queryKeys } from '@/shared/constants/queryKeys';
 import { getErrorMessage } from '@/shared/lib/getErrorMessage';
 import { PageHeader } from '@/shared/ui/PageHeader';
@@ -19,9 +20,9 @@ export function IssueCreatePage() {
         title: values.title,
         body: values.content || undefined,
       } as never),
-    onSuccess: (issue: { number: number }) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.issuesRoot(repositoryId ?? '') });
-      void navigate(`/repositories/${repositoryId}/issues/${issue.number}`);
+    onSuccess: (issue: { numberOrKey: string }) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.issuesRoot(DEFAULT_PLATFORM, repositoryId ?? '') });
+      void navigate(`/repositories/${repositoryId}/issues/${issue.numberOrKey}`);
     },
   });
 

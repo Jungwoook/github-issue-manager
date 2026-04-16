@@ -1,6 +1,7 @@
 export interface GitHubTokenStatus {
+  platform: string;
   connected: boolean;
-  githubLogin: string | null;
+  accountLogin: string | null;
   tokenScopes: string | null;
   tokenVerifiedAt: string | null;
 }
