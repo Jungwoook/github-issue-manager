@@ -1,11 +1,4 @@
-export interface GitHubTokenStatus {
-  platform: string;
-  connected: boolean;
-  accountLogin: string | null;
-  tokenScopes: string | null;
-  tokenVerifiedAt: string | null;
-}
-
-export interface RegisterGitHubTokenPayload {
-  accessToken: string;
-}
+export type {
+  PlatformTokenStatus as GitHubTokenStatus,
+  RegisterPlatformTokenPayload as RegisterGitHubTokenPayload,
+} from '@/entities/platform-connection/model/types';

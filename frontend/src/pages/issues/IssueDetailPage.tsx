@@ -6,57 +6,69 @@ import { createComment, getComments, refreshComments } from '@/entities/comment/
 import { deleteIssue, getIssueDetail, updateIssue } from '@/entities/issue/api/issueApi';
 import { CreateCommentForm } from '@/features/comment/create-comment/ui/CreateCommentForm';
 import { IssueStatusControl } from '@/features/issue/update-issue-status/ui/IssueStatusControl';
-import { DEFAULT_PLATFORM } from '@/shared/constants/platform';
 import { queryKeys } from '@/shared/constants/queryKeys';
 import { getErrorMessage } from '@/shared/lib/getErrorMessage';
+import { normalizePlatform, repositoryIssuesPath } from '@/shared/lib/routes';
 import { PageHeader } from '@/shared/ui/PageHeader';
 import { IssueDetailSection } from '@/widgets/issue-detail/IssueDetailSection';
 
 export function IssueDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { repositoryId, issueId } = useParams();
+  const { platform, repositoryId, issueId } = useParams();
+  const currentPlatform = normalizePlatform(platform);
 
   const issueQuery = useQuery({
-    queryKey: queryKeys.issue(DEFAULT_PLATFORM, repositoryId ?? '', issueId ?? ''),
-    queryFn: () => getIssueDetail(repositoryId ?? '', issueId ?? ''),
+    queryKey: queryKeys.issue(currentPlatform, repositoryId ?? '', issueId ?? ''),
+    queryFn: () => getIssueDetail(repositoryId ?? '', issueId ?? '', currentPlatform),
     enabled: Boolean(repositoryId && issueId),
   });
 
   const commentsQuery = useQuery({
-    queryKey: queryKeys.comments(DEFAULT_PLATFORM, repositoryId ?? '', issueId ?? ''),
-    queryFn: () => getComments(repositoryId ?? '', issueId ?? ''),
+    queryKey: queryKeys.comments(currentPlatform, repositoryId ?? '', issueId ?? ''),
+    queryFn: () => getComments(repositoryId ?? '', issueId ?? '', currentPlatform),
     enabled: Boolean(repositoryId && issueId),
   });
 
   const statusMutation = useMutation({
-    mutationFn: (state: 'OPEN' | 'CLOSED') => updateIssue(repositoryId ?? '', issueId ?? '', { state }),
+    mutationFn: (state: 'OPEN' | 'CLOSED') =>
+      updateIssue(repositoryId ?? '', issueId ?? '', { state }, currentPlatform),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.issue(DEFAULT_PLATFORM, repositoryId ?? '', issueId ?? '') });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.issuesRoot(DEFAULT_PLATFORM, repositoryId ?? '') });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.issue(currentPlatform, repositoryId ?? '', issueId ?? ''),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.issuesRoot(currentPlatform, repositoryId ?? ''),
+      });
     },
   });
 
   const refreshCommentsMutation = useMutation({
-    mutationFn: () => refreshComments(repositoryId ?? '', issueId ?? ''),
+    mutationFn: () => refreshComments(repositoryId ?? '', issueId ?? '', currentPlatform),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.comments(DEFAULT_PLATFORM, repositoryId ?? '', issueId ?? '') });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.comments(currentPlatform, repositoryId ?? '', issueId ?? ''),
+      });
     },
   });
 
   const createCommentMutation = useMutation({
     mutationFn: ({ content }: { content: string }) =>
-      createComment(repositoryId ?? '', issueId ?? '', { body: content }),
+      createComment(repositoryId ?? '', issueId ?? '', { body: content }, currentPlatform),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.comments(DEFAULT_PLATFORM, repositoryId ?? '', issueId ?? '') });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.comments(currentPlatform, repositoryId ?? '', issueId ?? ''),
+      });
     },
   });
 
   const deleteIssueMutation = useMutation({
-    mutationFn: () => deleteIssue(repositoryId ?? '', issueId ?? ''),
+    mutationFn: () => deleteIssue(repositoryId ?? '', issueId ?? '', currentPlatform),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.issuesRoot(DEFAULT_PLATFORM, repositoryId ?? '') });
-      void navigate(`/repositories/${repositoryId}/issues`);
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.issuesRoot(currentPlatform, repositoryId ?? ''),
+      });
+      void navigate(repositoryIssuesPath(repositoryId ?? '', currentPlatform));
     },
   });
 
@@ -74,7 +86,7 @@ export function IssueDetailPage() {
     <>
       <PageHeader
         title="이슈 상세"
-        description="선택한 GitHub 이슈의 상태와 댓글을 관리합니다."
+        description="선택한 이슈의 상태와 댓글을 관리합니다."
         actions={
           issueQuery.data ? (
             <button
@@ -83,7 +95,7 @@ export function IssueDetailPage() {
               disabled={deleteIssueMutation.isPending}
               onClick={() => deleteIssueMutation.mutate()}
             >
-              이슈 닫기
+              이슈 삭제
             </button>
           ) : null
         }
@@ -105,7 +117,7 @@ export function IssueDetailPage() {
           <section className="form-card">
             <div className="card-header">
               <div>
-                <h3 className="section-title">상태 및 댓글 동기화</h3>
+                <h3 className="section-title">상태 및 동기화</h3>
                 <p className="muted">이슈 상태를 변경하고 댓글 캐시를 새로고침할 수 있습니다.</p>
               </div>
               <div className="toolbar-actions">
@@ -128,7 +140,12 @@ export function IssueDetailPage() {
             </div>
           </section>
 
-          <IssueDetailSection repositoryId={repositoryId} issue={issueQuery.data} comments={commentsQuery.data ?? []} />
+          <IssueDetailSection
+            repositoryId={repositoryId}
+            platform={currentPlatform}
+            issue={issueQuery.data}
+            comments={commentsQuery.data ?? []}
+          />
 
           <CreateCommentForm
             disabled={createCommentMutation.isPending}

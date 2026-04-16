@@ -14,7 +14,7 @@ export function CreateCommentForm({ disabled, onSubmit }: CreateCommentFormProps
       <div className="card-header">
         <div>
           <h3 className="section-title">댓글 작성</h3>
-          <p className="muted">현재 이슈에 남길 내용을 입력합니다.</p>
+          <p className="muted">현재 이슈에 남길 메모나 진행 상황을 입력합니다.</p>
         </div>
       </div>
       <form
@@ -37,7 +37,7 @@ export function CreateCommentForm({ disabled, onSubmit }: CreateCommentFormProps
             rows={5}
             value={content}
             disabled={disabled}
-            placeholder="이슈 진행 상황이나 추가 정보를 입력하세요."
+            placeholder="이슈 진행 상황이나 추가 정보를 입력해 주세요."
             onChange={(event) => setContent(event.target.value)}
           />
         </div>
