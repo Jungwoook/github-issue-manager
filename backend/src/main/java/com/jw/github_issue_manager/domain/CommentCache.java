@@ -16,7 +16,7 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "comment_caches", indexes = {
-    @Index(name = "idx_comment_issue", columnList = "platform,github_issue_id")
+    @Index(name = "idx_comment_issue", columnList = "platform,issue_external_id")
 })
 public class CommentCache {
 
@@ -28,10 +28,10 @@ public class CommentCache {
     @Column(nullable = false)
     private PlatformType platform;
 
-    @Column(name = "github_comment_id", nullable = false, unique = true)
+    @Column(name = "external_id", nullable = false, unique = true)
     private String externalId;
 
-    @Column(name = "github_issue_id", nullable = false)
+    @Column(name = "issue_external_id", nullable = false)
     private String issueExternalId;
 
     @Column(nullable = false)

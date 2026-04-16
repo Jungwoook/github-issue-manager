@@ -16,8 +16,8 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "issue_caches", indexes = {
-    @Index(name = "idx_issue_repository", columnList = "platform,github_repository_id"),
-    @Index(name = "idx_issue_repository_number", columnList = "platform,github_repository_id,issueNumber", unique = true)
+    @Index(name = "idx_issue_repository", columnList = "platform,repository_external_id"),
+    @Index(name = "idx_issue_repository_number", columnList = "platform,repository_external_id,number_or_key", unique = true)
 })
 public class IssueCache {
 
@@ -29,13 +29,13 @@ public class IssueCache {
     @Column(nullable = false)
     private PlatformType platform;
 
-    @Column(name = "github_issue_id", nullable = false, unique = true)
+    @Column(name = "external_id", nullable = false, unique = true)
     private String externalId;
 
-    @Column(name = "github_repository_id", nullable = false)
+    @Column(name = "repository_external_id", nullable = false)
     private String repositoryExternalId;
 
-    @Column(name = "issueNumber", nullable = false)
+    @Column(name = "number_or_key", nullable = false)
     private String numberOrKey;
 
     @Column(nullable = false)
