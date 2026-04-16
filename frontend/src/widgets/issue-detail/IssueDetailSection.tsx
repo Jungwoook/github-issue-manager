@@ -4,24 +4,26 @@ import type { Comment } from '@/entities/comment/model/types';
 import type { IssueDetail } from '@/entities/issue/model/types';
 import { IssueMetaTags } from '@/entities/issue/ui/IssueMetaTags';
 import { formatDate } from '@/shared/lib/formatDate';
+import { repositoryIssueEditPath } from '@/shared/lib/routes';
 
 interface IssueDetailSectionProps {
+  platform: string;
   repositoryId: string;
   issue: IssueDetail;
   comments: Comment[];
 }
 
-export function IssueDetailSection({ repositoryId, issue, comments }: IssueDetailSectionProps) {
+export function IssueDetailSection({ platform, repositoryId, issue, comments }: IssueDetailSectionProps) {
   return (
     <div className="detail-stack">
       <section className="detail-card">
         <div className="card-header">
           <div className="stack-sm">
             <h3 className="section-title">{issue.title}</h3>
-            <span className="muted">이슈 #{issue.numberOrKey} 생성일 {formatDate(issue.createdAt)}</span>
+            <span className="muted">이슈 #{issue.numberOrKey} · 생성일 {formatDate(issue.createdAt)}</span>
           </div>
           <div className="toolbar-actions">
-            <Link className="button" to={`/repositories/${repositoryId}/issues/${issue.numberOrKey}/edit`}>
+            <Link className="button" to={repositoryIssueEditPath(repositoryId, issue.numberOrKey, platform)}>
               이슈 수정
             </Link>
           </div>
@@ -30,7 +32,7 @@ export function IssueDetailSection({ repositoryId, issue, comments }: IssueDetai
         <div className="stack-sm">
           <IssueMetaTags state={issue.state} />
           <div className="meta-list">
-            <span className="muted">작성자 {issue.authorLogin ?? '-'}</span>
+            <span className="muted">작성자: {issue.authorLogin ?? '-'}</span>
             <span className="muted">최종 수정: {formatDate(issue.updatedAt)}</span>
           </div>
         </div>
@@ -45,7 +47,7 @@ export function IssueDetailSection({ repositoryId, issue, comments }: IssueDetai
         <div className="card-header">
           <div>
             <h3 className="section-title">댓글</h3>
-            <p className="muted">이슈 댓글 목록입니다.</p>
+            <p className="muted">이슈에 연결된 댓글 목록입니다.</p>
           </div>
         </div>
 

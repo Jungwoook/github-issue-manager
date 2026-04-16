@@ -1,8 +1,11 @@
 import { NavLink } from 'react-router-dom';
 
+import { DEFAULT_PLATFORM } from '@/shared/constants/platform';
+import { platformSettingsPath, repositoriesPath } from '@/shared/lib/routes';
+
 const navItems = [
-  { to: '/repositories', label: '저장소' },
-  { to: '/settings/github', label: 'GitHub PAT' },
+  { to: repositoriesPath(DEFAULT_PLATFORM), label: '저장소' },
+  { to: platformSettingsPath(DEFAULT_PLATFORM), label: '플랫폼 연결' },
 ];
 
 export function MainNavigation() {
