@@ -95,7 +95,7 @@ export function IssueDetailPage() {
               disabled={deleteIssueMutation.isPending}
               onClick={() => deleteIssueMutation.mutate()}
             >
-              이슈 삭제
+              이슈 닫기
             </button>
           ) : null
         }

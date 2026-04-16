@@ -60,7 +60,7 @@ export function IssueEditPage() {
       {issueQuery.data ? (
         <IssueForm
           title="이슈 수정"
-          description="변경한 내용을 저장하면 이슈에 반영됩니다."
+          description="변경한 내용을 저장하면 이슈에 바로 반영됩니다."
           submitLabel="변경 사항 저장"
           initialValues={initialValues}
           errorMessage={updateIssueMutation.isError ? getErrorMessage(updateIssueMutation.error) : null}

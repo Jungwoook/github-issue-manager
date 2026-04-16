@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 
 import { RootLayout } from '@/app/layout/RootLayout';
 import { IssueCreatePage } from '@/pages/issues/IssueCreatePage';
@@ -66,13 +66,21 @@ export function AppRouter() {
 }
 
 function LegacyRouteRedirect({ to }: { to: (repositoryId: string) => string }) {
-  const repositoryId = window.location.pathname.split('/')[2];
+  const { repositoryId } = useParams();
+
+  if (!repositoryId) {
+    return <Navigate to={repositoriesPath(DEFAULT_PLATFORM)} replace />;
+  }
+
   return <Navigate to={to(repositoryId)} replace />;
 }
 
 function LegacyIssueRouteRedirect({ to }: { to: (repositoryId: string, issueId: string) => string }) {
-  const parts = window.location.pathname.split('/');
-  const repositoryId = parts[2];
-  const issueId = parts[4];
+  const { repositoryId, issueId } = useParams();
+
+  if (!repositoryId || !issueId) {
+    return <Navigate to={repositoriesPath(DEFAULT_PLATFORM)} replace />;
+  }
+
   return <Navigate to={to(repositoryId, issueId)} replace />;
 }

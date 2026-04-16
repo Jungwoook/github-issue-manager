@@ -183,7 +183,7 @@ function RepositoryListItem({ repository, platform }: { repository: Repository; 
                 {repository.private ? '비공개' : '공개'}
               </span>
             </div>
-            <span className="muted">동기화: {formatDate(repository.lastSyncedAt)}</span>
+            <span className="muted">동기화 {formatDate(repository.lastSyncedAt)}</span>
           </div>
 
           <div className="repository-actions">
