@@ -1,12 +1,12 @@
 import { useParams } from 'react-router-dom';
 
-import { DEFAULT_PLATFORM } from '@/shared/constants/platform';
+import { normalizePlatform } from '@/shared/lib/routes';
 import { PageHeader } from '@/shared/ui/PageHeader';
 import { PlatformConnectionForm } from '@/widgets/platform-connection/PlatformConnectionForm';
 
 export function PlatformConnectionPage() {
   const { platform } = useParams();
-  const currentPlatform = platform || DEFAULT_PLATFORM;
+  const currentPlatform = normalizePlatform(platform);
 
   return (
     <>

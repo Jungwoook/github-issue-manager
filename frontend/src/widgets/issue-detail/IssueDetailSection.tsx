@@ -20,7 +20,7 @@ export function IssueDetailSection({ platform, repositoryId, issue, comments }: 
         <div className="card-header">
           <div className="stack-sm">
             <h3 className="section-title">{issue.title}</h3>
-            <span className="muted">이슈 #{issue.numberOrKey} · 생성일 {formatDate(issue.createdAt)}</span>
+            <span className="muted">이슈 #{issue.numberOrKey} 생성일 {formatDate(issue.createdAt)}</span>
           </div>
           <div className="toolbar-actions">
             <Link className="button" to={repositoryIssueEditPath(repositoryId, issue.numberOrKey, platform)}>
@@ -32,7 +32,7 @@ export function IssueDetailSection({ platform, repositoryId, issue, comments }: 
         <div className="stack-sm">
           <IssueMetaTags state={issue.state} />
           <div className="meta-list">
-            <span className="muted">작성자: {issue.authorLogin ?? '-'}</span>
+            <span className="muted">작성자 {issue.authorLogin ?? '-'}</span>
             <span className="muted">최종 수정: {formatDate(issue.updatedAt)}</span>
           </div>
         </div>
