@@ -10,7 +10,7 @@ export function MainNavigation({ platform }: { platform: string }) {
 
   return (
     <nav className="nav-list" aria-label="주요 메뉴">
-      {navItems.map((item) => (
+      {getNavItems(platform).map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
