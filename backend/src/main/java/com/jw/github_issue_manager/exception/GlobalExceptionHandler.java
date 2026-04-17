@@ -50,6 +50,12 @@ public class GlobalExceptionHandler {
             .body(ErrorResponse.of("VALIDATION_ERROR", exception.getMessage()));
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException exception) {
+        return ResponseEntity.badRequest()
+            .body(ErrorResponse.of("VALIDATION_ERROR", exception.getMessage()));
+    }
+
     @ExceptionHandler({GitHubApiException.class, GitLabApiException.class})
     public ResponseEntity<ErrorResponse> handlePlatformApi(RuntimeException exception) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)

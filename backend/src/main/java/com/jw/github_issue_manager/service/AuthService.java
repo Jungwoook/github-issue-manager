@@ -1,5 +1,7 @@
 package com.jw.github_issue_manager.service;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 
 import org.springframework.stereotype.Service;
@@ -187,9 +189,47 @@ public class AuthService {
             if (requestedBaseUrl == null || requestedBaseUrl.isBlank()) {
                 return "https://gitlab.com/api/v4";
             }
-            return requestedBaseUrl.endsWith("/") ? requestedBaseUrl.substring(0, requestedBaseUrl.length() - 1) : requestedBaseUrl;
+            return normalizeGitLabBaseUrl(requestedBaseUrl);
         }
         return null;
+    }
+
+    private String normalizeGitLabBaseUrl(String requestedBaseUrl) {
+        try {
+            URI uri = new URI(requestedBaseUrl.trim());
+
+            if (!"https".equalsIgnoreCase(uri.getScheme())) {
+                throw new IllegalArgumentException("GitLab baseUrl must use HTTPS.");
+            }
+            if (uri.getHost() == null || uri.getHost().isBlank()) {
+                throw new IllegalArgumentException("GitLab baseUrl must include a valid host.");
+            }
+            if (uri.getQuery() != null || uri.getFragment() != null) {
+                throw new IllegalArgumentException("GitLab baseUrl must not include query parameters or fragments.");
+            }
+
+            String path = uri.getPath();
+            if (path == null || path.isBlank() || "/".equals(path)) {
+                path = "/api/v4";
+            } else {
+                path = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+                if (!path.endsWith("/api/v4")) {
+                    path = path + "/api/v4";
+                }
+            }
+
+            return new URI(
+                uri.getScheme().toLowerCase(),
+                uri.getUserInfo(),
+                uri.getHost().toLowerCase(),
+                uri.getPort(),
+                path,
+                null,
+                null
+            ).toString();
+        } catch (URISyntaxException | IllegalArgumentException exception) {
+            throw new IllegalArgumentException("GitLab baseUrl must be a valid HTTPS API base URL.", exception);
+        }
     }
 
     private String defaultTokenScopes(PlatformType platform) {

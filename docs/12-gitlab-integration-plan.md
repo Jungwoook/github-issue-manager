@@ -257,3 +257,31 @@
 - GitLab 프로젝트에서 이슈 목록, 상세, 생성, 수정, 댓글 흐름이 동작한다.
 - GitHub 기존 흐름에 회귀가 없다.
 - GitLab 특성인 `baseUrl`, `path_with_namespace`, `iid` 처리가 문서와 코드에서 일관된다.
+
+## 12. Backend Follow-up
+
+### 12.1 추가로 정리할 필요가 있는 항목
+
+- 연결 식별자 유니크 제약 재설계
+  - 현재 `PlatformConnection.externalUserId`, `accountLogin`은 단일 컬럼 unique 기준이다.
+  - GitLab self-managed까지 열어두면 같은 `externalUserId`나 `accountLogin`이 다른 인스턴스에서 충돌할 수 있다.
+  - 장기적으로는 `platform + baseUrl + externalUserId` 또는 이에 준하는 복합 식별 기준이 필요하다.
+- 접근 제어 기준 재설계
+  - 현재 `RepositoryService.requireAccessibleRepository`는 `ownerKey == accountLogin` 전제를 사용한다.
+  - GitLab group/subgroup 프로젝트나 GitHub organization 저장소처럼 "접근 가능하지만 owner가 다른 리소스"를 안정적으로 처리하기 어렵다.
+  - 사용자 연결과 저장소 접근 권한을 분리한 모델이 필요하다.
+- 저장소 캐시 모델 정리
+  - 현재 GitLab은 API 호출용 `path_with_namespace`를 `name/fullName`에 싣는 방식으로 동작한다.
+  - 장기적으로는 `displayName`, `pathWithNamespace`, `ownerKey`, `repositorySlug` 역할을 분리하는 것이 안전하다.
+- base URL 정규화 보강
+  - 현재는 입력값을 그대로 base URL로 저장한다.
+  - self-managed 사용 시 `/api/v4`를 포함하지 않은 URL, trailing slash, 잘못된 scheme 등을 정규화하거나 검증할 필요가 있다.
+- 연결/조회 통합 테스트 보강
+  - 현재는 gateway 단위와 일부 서비스 테스트 중심이다.
+  - `token 등록 -> 저장소 refresh -> 이슈/댓글 조회`까지 GitLab 시나리오를 통합 테스트로 보강하면 회귀를 줄일 수 있다.
+
+### 12.2 현재 기준 판단
+
+- 지금 상태는 "GitLab 2차 흐름 검증용"으로는 충분하다.
+- 다만 위 항목들은 실제 사용자/운영 환경에서 리소스 소유 구조와 self-managed 케이스를 다루기 위해 후속 백엔드 작업으로 남겨두는 것이 좋다.
+- 따라서 PR을 올리는 것은 가능하지만, 병합 전 또는 다음 단계에서 이 후속 백엔드 항목을 별도 이슈처럼 관리하는 것을 권장한다.

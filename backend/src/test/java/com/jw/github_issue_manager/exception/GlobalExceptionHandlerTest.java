@@ -58,4 +58,14 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().code()).isEqualTo("PLATFORM_API_ERROR");
         assertThat(response.getBody().message()).isEqualTo("upstream gateway error");
     }
+
+    @Test
+    void illegalArgumentUsesValidationErrorContract() {
+        var response = handler.handleIllegalArgument(new IllegalArgumentException("GitLab baseUrl must use HTTPS."));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().code()).isEqualTo("VALIDATION_ERROR");
+        assertThat(response.getBody().message()).isEqualTo("GitLab baseUrl must use HTTPS.");
+    }
 }

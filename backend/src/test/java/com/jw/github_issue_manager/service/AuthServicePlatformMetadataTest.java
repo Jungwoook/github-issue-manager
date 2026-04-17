@@ -1,6 +1,7 @@
 package com.jw.github_issue_manager.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -74,5 +75,19 @@ class AuthServicePlatformMetadataTest {
         assertThat(captor.getValue().getPlatform()).isEqualTo(PlatformType.GITLAB);
         assertThat(captor.getValue().getTokenScopes()).isEqualTo("api");
         assertThat(captor.getValue().getBaseUrl()).isEqualTo("https://gitlab.com/api/v4");
+    }
+
+    @Test
+    void appendsApiPathWhenGitLabBaseUrlDoesNotIncludeApiPath() {
+        String normalized = authService.resolvePlatformBaseUrl(PlatformType.GITLAB, "https://gitlab.example.com");
+
+        assertThat(normalized).isEqualTo("https://gitlab.example.com/api/v4");
+    }
+
+    @Test
+    void rejectsNonHttpsGitLabBaseUrl() {
+        assertThatThrownBy(() -> authService.resolvePlatformBaseUrl(PlatformType.GITLAB, "http://gitlab.example.com"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("GitLab baseUrl must be a valid HTTPS API base URL.");
     }
 }
