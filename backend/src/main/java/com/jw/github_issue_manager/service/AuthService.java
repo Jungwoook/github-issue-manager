@@ -53,7 +53,7 @@ public class AuthService {
                 platform,
                 userProfile.externalUserId()
             )
-            .map(existing -> updateExistingConnection(existing, userProfile, encryptedToken, now))
+            .map(existing -> updateExistingConnection(platform, existing, userProfile, encryptedToken, now))
             .orElseGet(() -> createConnection(platform, userProfile, encryptedToken, now));
 
         connection.touchAuthentication();
@@ -138,6 +138,7 @@ public class AuthService {
     }
 
     private PlatformConnection updateExistingConnection(
+        PlatformType platform,
         PlatformConnection connection,
         RemoteUserProfile userProfile,
         String encryptedToken,
@@ -148,7 +149,7 @@ public class AuthService {
         user.setEmail(userProfile.email());
         connection.setAccountLogin(userProfile.login());
         connection.setAvatarUrl(userProfile.avatarUrl());
-        connection.setTokenScopes("fine-grained");
+        connection.setTokenScopes(defaultTokenScopes(platform));
         connection.setAccessTokenEncrypted(encryptedToken);
         connection.markTokenVerified(verifiedAt);
         return connection;
@@ -168,10 +169,17 @@ public class AuthService {
             userProfile.login(),
             userProfile.avatarUrl(),
             encryptedToken,
-            "fine-grained"
+            defaultTokenScopes(platform)
         );
         connection.markTokenVerified(verifiedAt);
         return platformConnectionRepository.save(connection);
+    }
+
+    private String defaultTokenScopes(PlatformType platform) {
+        return switch (platform) {
+            case GITHUB -> "fine-grained";
+            case GITLAB -> "api";
+        };
     }
 
     private String resolveDisplayName(RemoteUserProfile userProfile) {

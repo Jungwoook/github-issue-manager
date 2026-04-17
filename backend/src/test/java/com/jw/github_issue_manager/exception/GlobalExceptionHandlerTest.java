@@ -15,7 +15,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void githubApiExceptionsUsePlatformApiErrorContract() {
-        var response = handler.handleGitHubApi(new GitHubApiException("platform upstream failure"));
+        var response = handler.handlePlatformApi(new GitHubApiException("platform upstream failure"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
         assertThat(response.getBody()).isNotNull();

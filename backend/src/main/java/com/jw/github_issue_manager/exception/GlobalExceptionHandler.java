@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.RestClientResponseException;
 
 import com.jw.github_issue_manager.github.GitHubApiException;
+import com.jw.github_issue_manager.gitlab.GitLabApiException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -49,8 +50,8 @@ public class GlobalExceptionHandler {
             .body(ErrorResponse.of("VALIDATION_ERROR", exception.getMessage()));
     }
 
-    @ExceptionHandler(GitHubApiException.class)
-    public ResponseEntity<ErrorResponse> handleGitHubApi(GitHubApiException exception) {
+    @ExceptionHandler({GitHubApiException.class, GitLabApiException.class})
+    public ResponseEntity<ErrorResponse> handlePlatformApi(RuntimeException exception) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
             .body(ErrorResponse.of(PLATFORM_API_ERROR, exception.getMessage()));
     }
