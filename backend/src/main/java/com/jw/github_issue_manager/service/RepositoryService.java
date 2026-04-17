@@ -51,7 +51,7 @@ public class RepositoryService {
         var connection = authService.requireCurrentConnection(platform, session);
         String accessToken = authService.requirePlatformAccessToken(platform, session);
         List<RemoteRepository> repositories = platformGatewayResolver.getGateway(platform)
-            .getAccessibleRepositories(accessToken);
+            .getAccessibleRepositories(accessToken, connection.getBaseUrl());
         repositories.forEach(this::upsertRepository);
 
         syncStateService.recordSuccess(

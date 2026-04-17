@@ -92,6 +92,29 @@ textarea:disabled {
   color: #fff;
 }
 
+.platform-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.platform-tab {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid #d9e2ec;
+  color: #46607a;
+  text-decoration: none;
+  font-weight: 600;
+  background: #fff;
+}
+
+.platform-tab.active,
+.platform-tab:hover {
+  border-color: #15324f;
+  background: #15324f;
+  color: #fff;
+}
+
 .page-header {
   display: flex;
   justify-content: space-between;

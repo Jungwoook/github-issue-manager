@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,17 +9,20 @@ import {
   registerPlatformToken,
 } from '@/entities/platform-connection/api/platformConnectionApi';
 import { refreshRepositories } from '@/entities/repository/api/repositoryApi';
-import { DEFAULT_PLATFORM } from '@/shared/constants/platform';
+import { DEFAULT_PLATFORM, PLATFORM_METADATA } from '@/shared/constants/platform';
 import { queryKeys } from '@/shared/constants/queryKeys';
 import { formatDate } from '@/shared/lib/formatDate';
 import { getErrorMessage } from '@/shared/lib/getErrorMessage';
-import { repositoriesPath } from '@/shared/lib/routes';
+import { platformSettingsPath, repositoriesPath } from '@/shared/lib/routes';
+import { PlatformTabs } from '@/shared/ui/PlatformTabs';
 
 export function PlatformConnectionForm({ platform = DEFAULT_PLATFORM }: { platform?: string }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [accessToken, setAccessToken] = useState('');
+  const [baseUrl, setBaseUrl] = useState('');
   const [isTokenVisible, setIsTokenVisible] = useState(false);
+  const platformMeta = PLATFORM_METADATA[platform as keyof typeof PLATFORM_METADATA] ?? PLATFORM_METADATA.github;
 
   const tokenStatusQuery = useQuery({
     queryKey: queryKeys.platformTokenStatus(platform),
@@ -28,9 +31,10 @@ export function PlatformConnectionForm({ platform = DEFAULT_PLATFORM }: { platfo
   });
 
   const registerMutation = useMutation({
-    mutationFn: (payload: { accessToken: string }) => registerPlatformToken(payload, platform),
+    mutationFn: (payload: { accessToken: string; baseUrl?: string | null }) => registerPlatformToken(payload, platform),
     onSuccess: async () => {
       setAccessToken('');
+      setBaseUrl('');
       setIsTokenVisible(false);
 
       try {
@@ -57,15 +61,26 @@ export function PlatformConnectionForm({ platform = DEFAULT_PLATFORM }: { platfo
   const isSubmitting = registerMutation.isPending || disconnectMutation.isPending;
   const status = tokenStatusQuery.data;
 
+  useEffect(() => {
+    if (platformMeta.supportsCustomBaseUrl) {
+      setBaseUrl(status?.baseUrl ?? '');
+      return;
+    }
+
+    setBaseUrl('');
+  }, [platformMeta.supportsCustomBaseUrl, status?.baseUrl]);
+
   return (
     <div className="page-stack">
       <section className="form-card">
         <div className="card-header">
           <div>
             <h3 className="section-title">플랫폼 토큰 연결</h3>
-            <p className="muted">현재는 GitHub fine-grained PAT를 등록해 저장소와 이슈를 관리할 수 있습니다.</p>
+            <p className="muted">{platformMeta.tokenHelp}</p>
           </div>
         </div>
+
+        <PlatformTabs currentPlatform={platform} to={platformSettingsPath} />
 
         {tokenStatusQuery.isLoading ? <div className="info-banner">현재 연결 상태를 불러오는 중입니다...</div> : null}
         {submitError ? <div className="error-banner">{getErrorMessage(submitError)}</div> : null}
@@ -75,7 +90,7 @@ export function PlatformConnectionForm({ platform = DEFAULT_PLATFORM }: { platfo
         <div className="github-status-panel">
           <div className="github-status-item">
             <span className="muted">플랫폼</span>
-            <strong>{platform.toUpperCase()}</strong>
+            <strong>{platformMeta.label}</strong>
           </div>
           <div className="github-status-item">
             <span className="muted">연결 상태</span>
@@ -89,6 +104,10 @@ export function PlatformConnectionForm({ platform = DEFAULT_PLATFORM }: { platfo
             <span className="muted">최근 확인</span>
             <strong>{status?.tokenVerifiedAt ? formatDate(status.tokenVerifiedAt) : '-'}</strong>
           </div>
+          <div className="github-status-item">
+            <span className="muted">Base URL</span>
+            <strong>{status?.baseUrl ?? platformMeta.defaultBaseUrl ?? '-'}</strong>
+          </div>
         </div>
 
         <form
@@ -99,11 +118,14 @@ export function PlatformConnectionForm({ platform = DEFAULT_PLATFORM }: { platfo
               return;
             }
 
-            registerMutation.mutate({ accessToken: accessToken.trim() });
+            registerMutation.mutate({
+              accessToken: accessToken.trim(),
+              baseUrl: platformMeta.supportsCustomBaseUrl ? baseUrl.trim() || null : null,
+            });
           }}
         >
           <div className="field">
-            <label htmlFor="platform-pat">Personal Access Token</label>
+            <label htmlFor="platform-pat">{platformMeta.tokenLabel}</label>
             <div className="password-field">
               <input
                 id="platform-pat"
@@ -112,7 +134,7 @@ export function PlatformConnectionForm({ platform = DEFAULT_PLATFORM }: { platfo
                 spellCheck={false}
                 value={accessToken}
                 disabled={isSubmitting}
-                placeholder="github_pat_..."
+                placeholder={platformMeta.tokenPlaceholder}
                 onChange={(event) => setAccessToken(event.target.value)}
               />
               <button
@@ -127,10 +149,27 @@ export function PlatformConnectionForm({ platform = DEFAULT_PLATFORM }: { platfo
                 {isTokenVisible ? '숨기기' : '보기'}
               </button>
             </div>
-            <p className="field-help">
-              현재는 GitHub PAT를 기준으로 동작합니다. 이후 다른 플랫폼도 같은 구조에 맞춰 확장합니다.
-            </p>
+            <p className="field-help">{platformMeta.tokenHelp}</p>
           </div>
+
+          {platformMeta.supportsCustomBaseUrl ? (
+            <div className="field">
+              <label htmlFor="platform-base-url">Base URL</label>
+              <input
+                id="platform-base-url"
+                type="url"
+                autoComplete="url"
+                spellCheck={false}
+                value={baseUrl}
+                disabled={isSubmitting}
+                placeholder={platformMeta.defaultBaseUrl}
+                onChange={(event) => setBaseUrl(event.target.value)}
+              />
+              <p className="field-help">
+                GitLab self-managed 인스턴스를 쓰면 API base URL을 입력합니다. 비워두면 {platformMeta.defaultBaseUrl}을 사용합니다.
+              </p>
+            </div>
+          ) : null}
 
           <div className="form-actions">
             <button
@@ -156,21 +195,21 @@ export function PlatformConnectionForm({ platform = DEFAULT_PLATFORM }: { platfo
         <div className="card-header">
           <div>
             <h3 className="section-title">현재 안내</h3>
-            <p className="muted">2차 리팩토링 단계에서는 구조를 공통화하고 실제 연결은 GitHub 기준으로 유지합니다.</p>
+            <p className="muted">2차 구현에서는 GitHub와 GitLab 연결 흐름을 같은 화면 구조에서 다룹니다.</p>
           </div>
         </div>
         <div className="page-stack">
           <div className="detail-card">
             <h4 className="card-title">지원 플랫폼</h4>
-            <p className="muted">현재: GitHub</p>
+            <p className="muted">현재: GitHub, GitLab</p>
           </div>
           <div className="detail-card">
             <h4 className="card-title">구조 목표</h4>
-            <p className="muted">다른 플랫폼도 같은 화면 구조로 연결 가능하도록 정리</p>
+            <p className="muted">플랫폼별 차이는 연결 설정과 안내에 두고 저장소/이슈 흐름은 공통 구조로 유지</p>
           </div>
           <div className="detail-card">
             <h4 className="card-title">다음 단계</h4>
-            <p className="muted">플랫폼 선택 UI와 추가 플랫폼 연결 화면 확장</p>
+            <p className="muted">GitLab self-managed 설정과 프로젝트 식별 규칙을 더 정교하게 보강</p>
           </div>
         </div>
       </section>

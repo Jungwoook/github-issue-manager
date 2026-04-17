@@ -30,10 +30,10 @@ class GitLabPlatformGatewayTest {
 
     @Test
     void mapsAuthenticatedUserToRemoteProfile() {
-        when(gitLabApiClient.getAuthenticatedUser("token"))
+        when(gitLabApiClient.getAuthenticatedUser("token", "https://gitlab.example.com/api/v4"))
             .thenReturn(new GitLabUserProfile(10L, "gitlab-user", "GitLab User", "gitlab@example.com", "avatar"));
 
-        RemoteUserProfile profile = gitLabPlatformGateway.getAuthenticatedUser("token");
+        RemoteUserProfile profile = gitLabPlatformGateway.getAuthenticatedUser("token", "https://gitlab.example.com/api/v4");
 
         assertThat(profile.platform()).isEqualTo(PlatformType.GITLAB);
         assertThat(profile.externalUserId()).isEqualTo("10");
@@ -43,9 +43,9 @@ class GitLabPlatformGatewayTest {
 
     @Test
     void mapsAccessibleProjectsToRemoteRepositoriesUsingAuthenticatedLoginForOwnership() {
-        when(gitLabApiClient.getAuthenticatedUser("token"))
+        when(gitLabApiClient.getAuthenticatedUser("token", "https://gitlab.example.com/api/v4"))
             .thenReturn(new GitLabUserProfile(10L, "gitlab-user", "GitLab User", "gitlab@example.com", "avatar"));
-        when(gitLabApiClient.getAccessibleProjects("token"))
+        when(gitLabApiClient.getAccessibleProjects("token", "https://gitlab.example.com/api/v4"))
             .thenReturn(List.of(new GitLabProjectInfo(
                 25L,
                 "group/sub/project-a",
@@ -57,7 +57,7 @@ class GitLabPlatformGatewayTest {
                 LocalDateTime.of(2026, 4, 18, 9, 0)
             )));
 
-        List<RemoteRepository> repositories = gitLabPlatformGateway.getAccessibleRepositories("token");
+        List<RemoteRepository> repositories = gitLabPlatformGateway.getAccessibleRepositories("token", "https://gitlab.example.com/api/v4");
 
         assertThat(repositories).hasSize(1);
         assertThat(repositories.get(0).platform()).isEqualTo(PlatformType.GITLAB);
@@ -69,7 +69,7 @@ class GitLabPlatformGatewayTest {
 
     @Test
     void usesProjectPathAndIssueIidForIssueAndCommentOperations() {
-        when(gitLabApiClient.getProjectIssues("token", "group/sub/project-a"))
+        when(gitLabApiClient.getProjectIssues("token", "https://gitlab.example.com/api/v4", "group/sub/project-a"))
             .thenReturn(List.of(new GitLabIssueInfo(
                 99L,
                 25L,
@@ -82,7 +82,7 @@ class GitLabPlatformGatewayTest {
                 LocalDateTime.of(2026, 4, 18, 10, 0),
                 null
             )));
-        when(gitLabApiClient.getIssueComments("token", "group/sub/project-a", "7"))
+        when(gitLabApiClient.getIssueComments("token", "https://gitlab.example.com/api/v4", "group/sub/project-a", "7"))
             .thenReturn(List.of(new GitLabCommentInfo(
                 501L,
                 "gitlab-user",
@@ -91,11 +91,22 @@ class GitLabPlatformGatewayTest {
                 LocalDateTime.of(2026, 4, 18, 10, 30)
             )));
 
-        List<RemoteIssue> issues = gitLabPlatformGateway.getRepositoryIssues("token", "ignored-owner", "group/sub/project-a");
-        List<RemoteComment> comments = gitLabPlatformGateway.getIssueComments("token", "ignored-owner", "group/sub/project-a", "7");
+        List<RemoteIssue> issues = gitLabPlatformGateway.getRepositoryIssues(
+            "token",
+            "https://gitlab.example.com/api/v4",
+            "ignored-owner",
+            "group/sub/project-a"
+        );
+        List<RemoteComment> comments = gitLabPlatformGateway.getIssueComments(
+            "token",
+            "https://gitlab.example.com/api/v4",
+            "ignored-owner",
+            "group/sub/project-a",
+            "7"
+        );
 
-        verify(gitLabApiClient).getProjectIssues("token", "group/sub/project-a");
-        verify(gitLabApiClient).getIssueComments("token", "group/sub/project-a", "7");
+        verify(gitLabApiClient).getProjectIssues("token", "https://gitlab.example.com/api/v4", "group/sub/project-a");
+        verify(gitLabApiClient).getIssueComments("token", "https://gitlab.example.com/api/v4", "group/sub/project-a", "7");
         assertThat(issues.get(0).numberOrKey()).isEqualTo("7");
         assertThat(issues.get(0).repositoryExternalId()).isEqualTo("25");
         assertThat(comments.get(0).externalId()).isEqualTo("501");

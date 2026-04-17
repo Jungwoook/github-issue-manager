@@ -29,8 +29,8 @@ public class DefaultGitLabApiClient implements GitLabApiClient {
     }
 
     @Override
-    public GitLabUserProfile getAuthenticatedUser(String personalAccessToken) {
-        GitLabUserResponse response = apiRequest("/user", personalAccessToken, GitLabUserResponse.class);
+    public GitLabUserProfile getAuthenticatedUser(String personalAccessToken, String apiBaseUrl) {
+        GitLabUserResponse response = apiRequest(apiBaseUrl, "/user", personalAccessToken, GitLabUserResponse.class);
         if (response == null) {
             throw new GitLabApiException("GitLab user response was empty.");
         }
@@ -44,8 +44,8 @@ public class DefaultGitLabApiClient implements GitLabApiClient {
     }
 
     @Override
-    public List<GitLabProjectInfo> getAccessibleProjects(String personalAccessToken) {
-        String uri = UriComponentsBuilder.fromUriString(properties.apiBaseUrl() + "/projects")
+    public List<GitLabProjectInfo> getAccessibleProjects(String personalAccessToken, String apiBaseUrl) {
+        String uri = UriComponentsBuilder.fromUriString(resolveApiBaseUrl(apiBaseUrl) + "/projects")
             .queryParam("membership", "true")
             .queryParam("min_access_level", "10")
             .queryParam("simple", "true")
@@ -70,8 +70,8 @@ public class DefaultGitLabApiClient implements GitLabApiClient {
     }
 
     @Override
-    public List<GitLabIssueInfo> getProjectIssues(String personalAccessToken, String projectPath) {
-        String uri = UriComponentsBuilder.fromUriString(projectApiPath(projectPath) + "/issues")
+    public List<GitLabIssueInfo> getProjectIssues(String personalAccessToken, String apiBaseUrl, String projectPath) {
+        String uri = UriComponentsBuilder.fromUriString(projectApiPath(apiBaseUrl, projectPath) + "/issues")
             .queryParam("state", "all")
             .queryParam("per_page", "100")
             .toUriString();
@@ -85,9 +85,9 @@ public class DefaultGitLabApiClient implements GitLabApiClient {
     }
 
     @Override
-    public GitLabIssueInfo createIssue(String personalAccessToken, String projectPath, String title, String body) {
+    public GitLabIssueInfo createIssue(String personalAccessToken, String apiBaseUrl, String projectPath, String title, String body) {
         GitLabIssueResponse response = restClient.post()
-            .uri(projectApiPath(projectPath) + "/issues")
+            .uri(projectApiPath(apiBaseUrl, projectPath) + "/issues")
             .header("PRIVATE-TOKEN", personalAccessToken)
             .contentType(MediaType.APPLICATION_JSON)
             .body(Map.of("title", title, "description", body == null ? "" : body))
@@ -97,7 +97,15 @@ public class DefaultGitLabApiClient implements GitLabApiClient {
     }
 
     @Override
-    public GitLabIssueInfo updateIssue(String personalAccessToken, String projectPath, String issueIid, String title, String body, String state) {
+    public GitLabIssueInfo updateIssue(
+        String personalAccessToken,
+        String apiBaseUrl,
+        String projectPath,
+        String issueIid,
+        String title,
+        String body,
+        String state
+    ) {
         Map<String, String> payload = new LinkedHashMap<>();
         if (title != null) {
             payload.put("title", title);
@@ -110,7 +118,7 @@ public class DefaultGitLabApiClient implements GitLabApiClient {
         }
 
         GitLabIssueResponse response = restClient.put()
-            .uri(projectApiPath(projectPath) + "/issues/" + issueIid)
+            .uri(projectApiPath(apiBaseUrl, projectPath) + "/issues/" + issueIid)
             .header("PRIVATE-TOKEN", personalAccessToken)
             .contentType(MediaType.APPLICATION_JSON)
             .body(payload)
@@ -120,8 +128,9 @@ public class DefaultGitLabApiClient implements GitLabApiClient {
     }
 
     @Override
-    public List<GitLabCommentInfo> getIssueComments(String personalAccessToken, String projectPath, String issueIid) {
+    public List<GitLabCommentInfo> getIssueComments(String personalAccessToken, String apiBaseUrl, String projectPath, String issueIid) {
         GitLabNoteResponse[] response = apiRequest(
+            apiBaseUrl,
             "/projects/" + encodeProjectPath(projectPath) + "/issues/" + issueIid + "/notes",
             personalAccessToken,
             GitLabNoteResponse[].class
@@ -136,9 +145,9 @@ public class DefaultGitLabApiClient implements GitLabApiClient {
     }
 
     @Override
-    public GitLabCommentInfo createComment(String personalAccessToken, String projectPath, String issueIid, String body) {
+    public GitLabCommentInfo createComment(String personalAccessToken, String apiBaseUrl, String projectPath, String issueIid, String body) {
         GitLabNoteResponse response = restClient.post()
-            .uri(projectApiPath(projectPath) + "/issues/" + issueIid + "/notes")
+            .uri(projectApiPath(apiBaseUrl, projectPath) + "/issues/" + issueIid + "/notes")
             .header("PRIVATE-TOKEN", personalAccessToken)
             .contentType(MediaType.APPLICATION_JSON)
             .body(Map.of("body", body))
@@ -147,8 +156,8 @@ public class DefaultGitLabApiClient implements GitLabApiClient {
         return toCommentInfo(response);
     }
 
-    private String projectApiPath(String projectPath) {
-        return properties.apiBaseUrl() + "/projects/" + encodeProjectPath(projectPath);
+    private String projectApiPath(String apiBaseUrl, String projectPath) {
+        return resolveApiBaseUrl(apiBaseUrl) + "/projects/" + encodeProjectPath(projectPath);
     }
 
     private String encodeProjectPath(String projectPath) {
@@ -163,8 +172,15 @@ public class DefaultGitLabApiClient implements GitLabApiClient {
         };
     }
 
-    private <T> T apiRequest(String path, String token, Class<T> responseType) {
-        return apiRequestAbsolute(properties.apiBaseUrl() + path, token, responseType);
+    private String resolveApiBaseUrl(String apiBaseUrl) {
+        if (apiBaseUrl == null || apiBaseUrl.isBlank()) {
+            return properties.apiBaseUrl();
+        }
+        return apiBaseUrl;
+    }
+
+    private <T> T apiRequest(String apiBaseUrl, String path, String token, Class<T> responseType) {
+        return apiRequestAbsolute(resolveApiBaseUrl(apiBaseUrl) + path, token, responseType);
     }
 
     private <T> T apiRequestAbsolute(String uri, String token, Class<T> responseType) {

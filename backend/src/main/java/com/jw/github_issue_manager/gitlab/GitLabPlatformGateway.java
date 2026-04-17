@@ -26,8 +26,8 @@ public class GitLabPlatformGateway implements PlatformGateway {
     }
 
     @Override
-    public RemoteUserProfile getAuthenticatedUser(String accessToken) {
-        GitLabUserProfile profile = gitLabApiClient.getAuthenticatedUser(accessToken);
+    public RemoteUserProfile getAuthenticatedUser(String accessToken, String baseUrl) {
+        GitLabUserProfile profile = gitLabApiClient.getAuthenticatedUser(accessToken, baseUrl);
         return new RemoteUserProfile(
             PlatformType.GITLAB,
             profile.id().toString(),
@@ -39,28 +39,29 @@ public class GitLabPlatformGateway implements PlatformGateway {
     }
 
     @Override
-    public List<RemoteRepository> getAccessibleRepositories(String accessToken) {
-        GitLabUserProfile profile = gitLabApiClient.getAuthenticatedUser(accessToken);
-        return gitLabApiClient.getAccessibleProjects(accessToken).stream()
+    public List<RemoteRepository> getAccessibleRepositories(String accessToken, String baseUrl) {
+        GitLabUserProfile profile = gitLabApiClient.getAuthenticatedUser(accessToken, baseUrl);
+        return gitLabApiClient.getAccessibleProjects(accessToken, baseUrl).stream()
             .map(project -> toRemoteRepository(profile.username(), project))
             .toList();
     }
 
     @Override
-    public List<RemoteIssue> getRepositoryIssues(String accessToken, String ownerKey, String repositoryName) {
-        return gitLabApiClient.getProjectIssues(accessToken, repositoryName).stream()
+    public List<RemoteIssue> getRepositoryIssues(String accessToken, String baseUrl, String ownerKey, String repositoryName) {
+        return gitLabApiClient.getProjectIssues(accessToken, baseUrl, repositoryName).stream()
             .map(this::toRemoteIssue)
             .toList();
     }
 
     @Override
-    public RemoteIssue createIssue(String accessToken, String ownerKey, String repositoryName, String title, String body) {
-        return toRemoteIssue(gitLabApiClient.createIssue(accessToken, repositoryName, title, body));
+    public RemoteIssue createIssue(String accessToken, String baseUrl, String ownerKey, String repositoryName, String title, String body) {
+        return toRemoteIssue(gitLabApiClient.createIssue(accessToken, baseUrl, repositoryName, title, body));
     }
 
     @Override
     public RemoteIssue updateIssue(
         String accessToken,
+        String baseUrl,
         String ownerKey,
         String repositoryName,
         String issueKey,
@@ -68,19 +69,19 @@ public class GitLabPlatformGateway implements PlatformGateway {
         String body,
         String state
     ) {
-        return toRemoteIssue(gitLabApiClient.updateIssue(accessToken, repositoryName, issueKey, title, body, state));
+        return toRemoteIssue(gitLabApiClient.updateIssue(accessToken, baseUrl, repositoryName, issueKey, title, body, state));
     }
 
     @Override
-    public List<RemoteComment> getIssueComments(String accessToken, String ownerKey, String repositoryName, String issueKey) {
-        return gitLabApiClient.getIssueComments(accessToken, repositoryName, issueKey).stream()
+    public List<RemoteComment> getIssueComments(String accessToken, String baseUrl, String ownerKey, String repositoryName, String issueKey) {
+        return gitLabApiClient.getIssueComments(accessToken, baseUrl, repositoryName, issueKey).stream()
             .map(this::toRemoteComment)
             .toList();
     }
 
     @Override
-    public RemoteComment createComment(String accessToken, String ownerKey, String repositoryName, String issueKey, String body) {
-        return toRemoteComment(gitLabApiClient.createComment(accessToken, repositoryName, issueKey, body));
+    public RemoteComment createComment(String accessToken, String baseUrl, String ownerKey, String repositoryName, String issueKey, String body) {
+        return toRemoteComment(gitLabApiClient.createComment(accessToken, baseUrl, repositoryName, issueKey, body));
     }
 
     private RemoteRepository toRemoteRepository(String accountLogin, GitLabProjectInfo project) {

@@ -4,16 +4,17 @@ import java.util.List;
 
 public interface GitLabApiClient {
 
-    GitLabUserProfile getAuthenticatedUser(String personalAccessToken);
+    GitLabUserProfile getAuthenticatedUser(String personalAccessToken, String apiBaseUrl);
 
-    List<GitLabProjectInfo> getAccessibleProjects(String personalAccessToken);
+    List<GitLabProjectInfo> getAccessibleProjects(String personalAccessToken, String apiBaseUrl);
 
-    List<GitLabIssueInfo> getProjectIssues(String personalAccessToken, String projectPath);
+    List<GitLabIssueInfo> getProjectIssues(String personalAccessToken, String apiBaseUrl, String projectPath);
 
-    GitLabIssueInfo createIssue(String personalAccessToken, String projectPath, String title, String body);
+    GitLabIssueInfo createIssue(String personalAccessToken, String apiBaseUrl, String projectPath, String title, String body);
 
     GitLabIssueInfo updateIssue(
         String personalAccessToken,
+        String apiBaseUrl,
         String projectPath,
         String issueIid,
         String title,
@@ -21,7 +22,7 @@ public interface GitLabApiClient {
         String state
     );
 
-    List<GitLabCommentInfo> getIssueComments(String personalAccessToken, String projectPath, String issueIid);
+    List<GitLabCommentInfo> getIssueComments(String personalAccessToken, String apiBaseUrl, String projectPath, String issueIid);
 
-    GitLabCommentInfo createComment(String personalAccessToken, String projectPath, String issueIid, String body);
+    GitLabCommentInfo createComment(String personalAccessToken, String apiBaseUrl, String projectPath, String issueIid, String body);
 }

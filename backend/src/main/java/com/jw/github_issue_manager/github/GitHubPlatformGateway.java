@@ -26,7 +26,7 @@ public class GitHubPlatformGateway implements PlatformGateway {
     }
 
     @Override
-    public RemoteUserProfile getAuthenticatedUser(String accessToken) {
+    public RemoteUserProfile getAuthenticatedUser(String accessToken, String baseUrl) {
         GitHubUserProfile profile = gitHubApiClient.getAuthenticatedUser(accessToken);
         return new RemoteUserProfile(
             PlatformType.GITHUB,
@@ -39,27 +39,28 @@ public class GitHubPlatformGateway implements PlatformGateway {
     }
 
     @Override
-    public List<RemoteRepository> getAccessibleRepositories(String accessToken) {
+    public List<RemoteRepository> getAccessibleRepositories(String accessToken, String baseUrl) {
         return gitHubApiClient.getAccessibleRepositories(accessToken).stream()
             .map(this::toRemoteRepository)
             .toList();
     }
 
     @Override
-    public List<RemoteIssue> getRepositoryIssues(String accessToken, String ownerKey, String repositoryName) {
+    public List<RemoteIssue> getRepositoryIssues(String accessToken, String baseUrl, String ownerKey, String repositoryName) {
         return gitHubApiClient.getRepositoryIssues(accessToken, ownerKey, repositoryName).stream()
             .map(this::toRemoteIssue)
             .toList();
     }
 
     @Override
-    public RemoteIssue createIssue(String accessToken, String ownerKey, String repositoryName, String title, String body) {
+    public RemoteIssue createIssue(String accessToken, String baseUrl, String ownerKey, String repositoryName, String title, String body) {
         return toRemoteIssue(gitHubApiClient.createIssue(accessToken, ownerKey, repositoryName, title, body));
     }
 
     @Override
     public RemoteIssue updateIssue(
         String accessToken,
+        String baseUrl,
         String ownerKey,
         String repositoryName,
         String issueKey,
@@ -79,14 +80,14 @@ public class GitHubPlatformGateway implements PlatformGateway {
     }
 
     @Override
-    public List<RemoteComment> getIssueComments(String accessToken, String ownerKey, String repositoryName, String issueKey) {
+    public List<RemoteComment> getIssueComments(String accessToken, String baseUrl, String ownerKey, String repositoryName, String issueKey) {
         return gitHubApiClient.getIssueComments(accessToken, ownerKey, repositoryName, Integer.parseInt(issueKey)).stream()
             .map(this::toRemoteComment)
             .toList();
     }
 
     @Override
-    public RemoteComment createComment(String accessToken, String ownerKey, String repositoryName, String issueKey, String body) {
+    public RemoteComment createComment(String accessToken, String baseUrl, String ownerKey, String repositoryName, String issueKey, String body) {
         return toRemoteComment(gitHubApiClient.createComment(accessToken, ownerKey, repositoryName, Integer.parseInt(issueKey), body));
     }
 

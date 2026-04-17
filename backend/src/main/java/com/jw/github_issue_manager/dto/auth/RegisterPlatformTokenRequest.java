@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 
 public record RegisterPlatformTokenRequest(
     @NotBlank(message = "accessToken is required")
-    String accessToken
+    String accessToken,
+    String baseUrl
 ) {
 }

@@ -61,17 +61,18 @@ class AuthServicePlatformMetadataTest {
             "avatar"
         );
         when(platformGatewayResolver.getGateway(PlatformType.GITLAB)).thenReturn(platformGateway);
-        when(platformGateway.getAuthenticatedUser("token")).thenReturn(profile);
+        when(platformGateway.getAuthenticatedUser("token", "https://gitlab.com/api/v4")).thenReturn(profile);
         when(patCryptoService.encrypt("token")).thenReturn("encrypted-token");
         when(platformConnectionRepository.findByPlatformAndExternalUserId(PlatformType.GITLAB, "42")).thenReturn(Optional.empty());
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(platformConnectionRepository.save(any(PlatformConnection.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        authService.registerPlatformToken(PlatformType.GITLAB, new RegisterPlatformTokenRequest("token"), session);
+        authService.registerPlatformToken(PlatformType.GITLAB, new RegisterPlatformTokenRequest("token", null), session);
 
         ArgumentCaptor<PlatformConnection> captor = ArgumentCaptor.forClass(PlatformConnection.class);
         verify(platformConnectionRepository).save(captor.capture());
         assertThat(captor.getValue().getPlatform()).isEqualTo(PlatformType.GITLAB);
         assertThat(captor.getValue().getTokenScopes()).isEqualTo("api");
+        assertThat(captor.getValue().getBaseUrl()).isEqualTo("https://gitlab.com/api/v4");
     }
 }

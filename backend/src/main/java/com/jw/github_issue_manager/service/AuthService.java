@@ -45,16 +45,17 @@ public class AuthService {
 
     @Transactional
     public MeResponse registerPlatformToken(PlatformType platform, RegisterPlatformTokenRequest request, HttpSession session) {
+        String baseUrl = resolvePlatformBaseUrl(platform, request.baseUrl());
         RemoteUserProfile userProfile = platformGatewayResolver.getGateway(platform)
-            .getAuthenticatedUser(request.accessToken());
+            .getAuthenticatedUser(request.accessToken(), baseUrl);
         String encryptedToken = patCryptoService.encrypt(request.accessToken());
         LocalDateTime now = LocalDateTime.now();
         PlatformConnection connection = platformConnectionRepository.findByPlatformAndExternalUserId(
                 platform,
                 userProfile.externalUserId()
             )
-            .map(existing -> updateExistingConnection(platform, existing, userProfile, encryptedToken, now))
-            .orElseGet(() -> createConnection(platform, userProfile, encryptedToken, now));
+            .map(existing -> updateExistingConnection(platform, existing, userProfile, encryptedToken, baseUrl, now))
+            .orElseGet(() -> createConnection(platform, userProfile, encryptedToken, baseUrl, now));
 
         connection.touchAuthentication();
         session.setAttribute(CURRENT_USER_ID, connection.getUser().getId());
@@ -76,6 +77,7 @@ public class AuthService {
             connection.getAccountLogin(),
             connection.getAvatarUrl(),
             connection.getTokenScopes(),
+            connection.getBaseUrl(),
             connection.getConnectedAt(),
             connection.getLastAuthenticatedAt()
         );
@@ -89,6 +91,7 @@ public class AuthService {
             connection.getAccessTokenEncrypted() != null && !connection.getAccessTokenEncrypted().isBlank(),
             connection.getAccountLogin(),
             connection.getTokenScopes(),
+            connection.getBaseUrl(),
             connection.getTokenVerifiedAt()
         );
     }
@@ -142,6 +145,7 @@ public class AuthService {
         PlatformConnection connection,
         RemoteUserProfile userProfile,
         String encryptedToken,
+        String baseUrl,
         LocalDateTime verifiedAt
     ) {
         User user = connection.getUser();
@@ -150,6 +154,7 @@ public class AuthService {
         connection.setAccountLogin(userProfile.login());
         connection.setAvatarUrl(userProfile.avatarUrl());
         connection.setTokenScopes(defaultTokenScopes(platform));
+        connection.setBaseUrl(baseUrl);
         connection.setAccessTokenEncrypted(encryptedToken);
         connection.markTokenVerified(verifiedAt);
         return connection;
@@ -159,6 +164,7 @@ public class AuthService {
         PlatformType platform,
         RemoteUserProfile userProfile,
         String encryptedToken,
+        String baseUrl,
         LocalDateTime verifiedAt
     ) {
         User user = userRepository.save(new User(resolveDisplayName(userProfile), userProfile.email()));
@@ -169,10 +175,21 @@ public class AuthService {
             userProfile.login(),
             userProfile.avatarUrl(),
             encryptedToken,
-            defaultTokenScopes(platform)
+            defaultTokenScopes(platform),
+            baseUrl
         );
         connection.markTokenVerified(verifiedAt);
         return platformConnectionRepository.save(connection);
+    }
+
+    public String resolvePlatformBaseUrl(PlatformType platform, String requestedBaseUrl) {
+        if (platform == PlatformType.GITLAB) {
+            if (requestedBaseUrl == null || requestedBaseUrl.isBlank()) {
+                return "https://gitlab.com/api/v4";
+            }
+            return requestedBaseUrl.endsWith("/") ? requestedBaseUrl.substring(0, requestedBaseUrl.length() - 1) : requestedBaseUrl;
+        }
+        return null;
     }
 
     private String defaultTokenScopes(PlatformType platform) {

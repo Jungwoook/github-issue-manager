@@ -185,3 +185,75 @@
 - 서비스 계층은 그대로 두고 GitLab 차이는 gateway와 config로 흡수한다.
 - 1차 목표는 "GitLab 지원 완료"보다 "공통 구조가 두 번째 플랫폼까지 버티는지 검증"에 둔다.
 - self-managed GitLab은 2차 확장 과제로 미룬다.
+
+## 11. Phase 2 Scope
+
+### 11.1 목표
+
+- 1차에서 만든 GitLab 백엔드 연동을 실제 사용자 흐름에서 사용할 수 있게 확장한다.
+- GitLab.com 기준 최소 연동에서 멈추지 않고, 설정/표시/운영 차이를 공통 구조 안에서 안정화한다.
+- GitLab 추가가 일회성 예외 구현이 아니라 다음 플랫폼 확장의 기준이 되도록 만든다.
+
+### 11.2 2차 구현 범위
+
+- 플랫폼 연결 계약 확장
+  - 연결 요청/응답에 `baseUrl` 확장
+  - GitLab 미입력 시 기본값 `https://gitlab.com/api/v4` 처리
+  - 추후 self-managed 입력 가능 구조 확보
+- 프로젝트 식별자/표시 모델 정리
+  - 조회용 식별자와 표시용 이름 분리
+  - `project id`, `path_with_namespace`, 사용자 표시 문자열 역할 고정
+  - 현재 `ownerKey`와 접근 제어 전제 재검토
+- 프론트 플랫폼 연결 화면 확장
+  - GitLab 선택지 표시
+  - GitLab PAT 안내 문구 분리
+  - 필요 시 고급 설정으로 base URL 입력 추가
+- 프론트 프로젝트/이슈 흐름 연결
+  - GitLab 프로젝트 목록 조회
+  - GitLab 이슈 목록/상세/생성/수정/댓글 흐름 연결
+  - `numberOrKey = iid` 기준 라우트와 화면 표시 확인
+- 에러/운영 메시지 보강
+  - GitLab 인증 실패, 권한 부족, 잘못된 base URL 상황 메시지 정리
+  - GitHub/GitLab별 연결 가이드 분리
+- 테스트 보강
+  - GitLab 연결 API 통합 테스트
+  - 프로젝트 path / `iid` / base URL 관련 회귀 테스트
+  - 프론트 플랫폼별 렌더링과 라우트 테스트
+
+### 11.3 2차 선행 확인 사항
+
+- 현재 `RepositoryService.requireAccessibleRepository`가 `ownerKey == accountLogin` 전제를 갖고 있는지 점검
+- GitLab group/subgroup 프로젝트를 현재 캐시 구조에서 안전하게 다룰 수 있는지 확인
+- `PlatformConnection`에 base URL을 저장할지, 별도 설정 객체로 분리할지 결정
+- 프론트에서 GitHub 전용 문구와 query key가 완전히 플랫폼 중립 구조인지 확인
+
+### 11.4 2차에서 해결할 핵심 문제
+
+- 접근 가능한 프로젝트의 소유자와 로그인 사용자가 다를 때도 조회/상세가 동작해야 한다.
+- GitLab `path_with_namespace`를 API 호출용으로 쓰면서도 UI에는 읽기 좋은 이름을 유지해야 한다.
+- self-managed GitLab을 열어둘 수 있는 설정 구조가 필요하지만, 2차에서도 기본 기준은 GitLab.com이어야 한다.
+- GitLab 전용 예외 상황이 서비스 계층이 아니라 연결/설정/어댑터 계층에서 처리되어야 한다.
+
+### 11.5 2차 제외 범위
+
+- merge request 연동
+- labels, milestones, assignees 같은 GitLab 전용 확장 기능
+- project/group access token 전용 관리 UI
+- 여러 GitLab 연결 계정을 동시에 관리하는 기능
+- 운영 문서 수준의 self-managed 설치/배포 가이드
+
+### 11.6 권장 구현 순서
+
+1. `baseUrl` 포함 플랫폼 연결 계약 확정
+2. 프로젝트 식별자/접근 제어 규칙 정리
+3. GitLab 연결 화면과 안내 문구 반영
+4. GitLab 프로젝트/이슈/댓글 프론트 연결
+5. GitLab 전용 오류/예외 메시지 보강
+6. 통합 테스트와 회귀 테스트 보강
+
+### 11.7 완료 기준
+
+- 사용자가 프론트에서 GitLab 연결을 생성하고 프로젝트 목록을 조회할 수 있다.
+- GitLab 프로젝트에서 이슈 목록, 상세, 생성, 수정, 댓글 흐름이 동작한다.
+- GitHub 기존 흐름에 회귀가 없다.
+- GitLab 특성인 `baseUrl`, `path_with_namespace`, `iid` 처리가 문서와 코드에서 일관된다.

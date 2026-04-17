@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
 import { getPlatformTokenStatus } from '@/entities/platform-connection/api/platformConnectionApi';
-import { DEFAULT_PLATFORM } from '@/shared/constants/platform';
+import { DEFAULT_PLATFORM, PLATFORM_METADATA } from '@/shared/constants/platform';
 import { queryKeys } from '@/shared/constants/queryKeys';
 import { formatDate } from '@/shared/lib/formatDate';
 import { platformSettingsPath } from '@/shared/lib/routes';
@@ -32,15 +32,18 @@ export function PlatformConnectionStatus({ platform = DEFAULT_PLATFORM }: { plat
   }
 
   const status = statusQuery.data;
+  const platformLabel = PLATFORM_METADATA[platform as keyof typeof PLATFORM_METADATA]?.label ?? platform.toUpperCase();
 
   return (
     <div className="sidebar-status-card">
       <strong>{status.connected ? '연결됨' : '연결 필요'}</strong>
+      <p className="muted">플랫폼: {platformLabel}</p>
       <p className="muted">
         {status.connected && status.accountLogin
           ? `계정: ${status.accountLogin}`
           : '토큰을 등록하면 저장소와 이슈를 불러올 수 있습니다.'}
       </p>
+      {status.connected && status.baseUrl ? <p className="muted">Base URL: {status.baseUrl}</p> : null}
       {status.connected && status.tokenVerifiedAt ? (
         <p className="muted">최근 확인: {formatDate(status.tokenVerifiedAt)}</p>
       ) : null}
