@@ -1,9 +1,11 @@
 import { Link, useParams } from 'react-router-dom';
 
+import { normalizePlatform, repositoryIssuesPath } from '@/shared/lib/routes';
 import { PageHeader } from '@/shared/ui/PageHeader';
 
 export function LabelManagementPage() {
-  const { repositoryId } = useParams();
+  const { platform, repositoryId } = useParams();
+  const currentPlatform = normalizePlatform(platform);
 
   if (!repositoryId) {
     return <div className="error-banner">경로에 저장소 ID가 없습니다.</div>;
@@ -13,9 +15,9 @@ export function LabelManagementPage() {
     <>
       <PageHeader
         title="라벨"
-        description="현재 PAT 기반 최소 구현 범위에서는 라벨 관리를 지원하지 않습니다."
+        description="현재 최소 구현 범위에서는 라벨 관리 기능을 제공하지 않습니다."
         actions={
-          <Link className="button" to={`/repositories/${repositoryId}/issues`}>
+          <Link className="button" to={repositoryIssuesPath(repositoryId, currentPlatform)}>
             이슈 목록으로
           </Link>
         }
@@ -25,11 +27,11 @@ export function LabelManagementPage() {
         <div className="card-header">
           <div>
             <h3 className="section-title">지원 예정 기능</h3>
-            <p className="muted">현재 백엔드에는 GitHub 라벨 조회 및 수정 엔드포인트가 없어 이 화면은 안내용으로 유지됩니다.</p>
+            <p className="muted">라벨 조회와 수정 API가 준비되면 같은 플랫폼 구조 안에서 확장할 예정입니다.</p>
           </div>
         </div>
         <div className="empty-state">
-          라벨 기능을 사용하려면 백엔드에 `/api/repositories/{'{repositoryId}'}/labels` 계열 API를 추가해야 합니다.
+          라벨 기능을 지원하려면 저장소 기준 라벨 조회 및 수정 API를 백엔드에 추가해야 합니다.
         </div>
       </section>
     </>

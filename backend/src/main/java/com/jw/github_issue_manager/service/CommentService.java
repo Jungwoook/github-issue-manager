@@ -103,9 +103,7 @@ public class CommentService {
     }
 
     private CommentCache upsertComment(IssueCache issue, RemoteComment commentInfo) {
-        return commentCacheRepository.findByPlatformAndIssueExternalIdOrderByCreatedAtAsc(issue.getPlatform(), issue.getExternalId()).stream()
-            .filter(existing -> existing.getExternalId().equals(commentInfo.externalId()))
-            .findFirst()
+        return commentCacheRepository.findByPlatformAndExternalId(issue.getPlatform(), commentInfo.externalId())
             .orElseGet(() -> commentCacheRepository.save(new CommentCache(
                 issue.getPlatform(),
                 commentInfo.externalId(),

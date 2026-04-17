@@ -17,6 +17,8 @@ import com.jw.github_issue_manager.github.GitHubApiException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final String PLATFORM_API_ERROR = "PLATFORM_API_ERROR";
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -50,7 +52,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(GitHubApiException.class)
     public ResponseEntity<ErrorResponse> handleGitHubApi(GitHubApiException exception) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-            .body(ErrorResponse.of("GITHUB_API_ERROR", exception.getMessage()));
+            .body(ErrorResponse.of(PLATFORM_API_ERROR, exception.getMessage()));
     }
 
     @ExceptionHandler(PlatformIntegrationException.class)
@@ -70,7 +72,7 @@ public class GlobalExceptionHandler {
         }
 
         return ResponseEntity.status(responseStatus)
-            .body(ErrorResponse.of("GITHUB_API_ERROR", message));
+            .body(ErrorResponse.of(PLATFORM_API_ERROR, message));
     }
 
     private ErrorResponse.FieldErrorDetail toFieldErrorDetail(FieldError fieldError) {

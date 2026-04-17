@@ -6,44 +6,49 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteIssue, getIssues, refreshIssues } from '@/entities/issue/api/issueApi';
 import { IssueMetaTags } from '@/entities/issue/ui/IssueMetaTags';
 import { getRepository } from '@/entities/repository/api/repositoryApi';
-import { DEFAULT_PLATFORM } from '@/shared/constants/platform';
 import { queryKeys } from '@/shared/constants/queryKeys';
 import { formatDate } from '@/shared/lib/formatDate';
 import { getErrorMessage } from '@/shared/lib/getErrorMessage';
+import { normalizePlatform, repositoryIssueEditPath, repositoryIssuePath } from '@/shared/lib/routes';
 
 export function IssueListWidget() {
-  const { repositoryId } = useParams();
+  const { platform, repositoryId } = useParams();
+  const currentPlatform = normalizePlatform(platform);
   const queryClient = useQueryClient();
   const [keyword, setKeyword] = useState('');
   const [state, setState] = useState('');
 
   const repositoryQuery = useQuery({
-    queryKey: queryKeys.repository(DEFAULT_PLATFORM, repositoryId ?? ''),
-    queryFn: () => getRepository(repositoryId ?? ''),
+    queryKey: queryKeys.repository(currentPlatform, repositoryId ?? ''),
+    queryFn: () => getRepository(repositoryId ?? '', currentPlatform),
     enabled: Boolean(repositoryId),
   });
 
   const issuesQuery = useQuery({
-    queryKey: queryKeys.issues(DEFAULT_PLATFORM, repositoryId ?? '', { keyword, state }),
+    queryKey: queryKeys.issues(currentPlatform, repositoryId ?? '', { keyword, state }),
     queryFn: () =>
-      getIssues(repositoryId ?? '', {
-        keyword: keyword || undefined,
-        state: (state || undefined) as never,
-      }),
+      getIssues(
+        repositoryId ?? '',
+        {
+          keyword: keyword || undefined,
+          state: (state || undefined) as never,
+        },
+        currentPlatform,
+      ),
     enabled: Boolean(repositoryId),
   });
 
   const refreshIssuesMutation = useMutation({
-    mutationFn: () => refreshIssues(repositoryId ?? ''),
+    mutationFn: () => refreshIssues(repositoryId ?? '', currentPlatform),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.issuesRoot(DEFAULT_PLATFORM, repositoryId ?? '') });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.issuesRoot(currentPlatform, repositoryId ?? '') });
     },
   });
 
   const deleteIssueMutation = useMutation({
-    mutationFn: (issueId: string) => deleteIssue(repositoryId ?? '', issueId),
+    mutationFn: (issueId: string) => deleteIssue(repositoryId ?? '', issueId, currentPlatform),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.issuesRoot(DEFAULT_PLATFORM, repositoryId ?? '') });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.issuesRoot(currentPlatform, repositoryId ?? '') });
     },
   });
 
@@ -129,12 +134,8 @@ export function IssueListWidget() {
             이슈 새로고침에 실패했습니다. {getErrorMessage(refreshIssuesMutation.error)}
           </div>
         ) : null}
-        {refreshIssuesMutation.isSuccess ? (
-          <div className="success-banner">이슈 목록을 새로고침했습니다.</div>
-        ) : null}
-        {issues.length === 0 && !issuesQuery.isLoading ? (
-          <div className="empty-state">조건에 맞는 이슈가 없습니다.</div>
-        ) : null}
+        {refreshIssuesMutation.isSuccess ? <div className="success-banner">이슈 목록을 새로고침했습니다.</div> : null}
+        {issues.length === 0 && !issuesQuery.isLoading ? <div className="empty-state">조건에 맞는 이슈가 없습니다.</div> : null}
 
         {issues.length > 0 ? (
           <div className="table-wrap">
@@ -153,7 +154,10 @@ export function IssueListWidget() {
                   <tr key={issue.issueId}>
                     <td>
                       <div className="stack-sm">
-                        <Link className="issue-title-link" to={`/repositories/${repositoryId}/issues/${issue.numberOrKey}`}>
+                        <Link
+                          className="issue-title-link"
+                          to={repositoryIssuePath(repositoryId, issue.numberOrKey, currentPlatform)}
+                        >
                           {issue.title}
                         </Link>
                         <span className="muted">#{issue.numberOrKey}</span>
@@ -166,10 +170,16 @@ export function IssueListWidget() {
                     <td>{formatDate(issue.updatedAt)}</td>
                     <td>
                       <div className="toolbar-actions">
-                        <Link className="inline-button" to={`/repositories/${repositoryId}/issues/${issue.numberOrKey}`}>
-                          열기
+                        <Link
+                          className="inline-button"
+                          to={repositoryIssuePath(repositoryId, issue.numberOrKey, currentPlatform)}
+                        >
+                          보기
                         </Link>
-                        <Link className="inline-button" to={`/repositories/${repositoryId}/issues/${issue.numberOrKey}/edit`}>
+                        <Link
+                          className="inline-button"
+                          to={repositoryIssueEditPath(repositoryId, issue.numberOrKey, currentPlatform)}
+                        >
                           수정
                         </Link>
                         <button

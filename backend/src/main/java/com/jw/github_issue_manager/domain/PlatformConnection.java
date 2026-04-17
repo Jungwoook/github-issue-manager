@@ -18,7 +18,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "github_accounts")
+@Table(name = "platform_connections")
 public class PlatformConnection {
 
     @Id
@@ -33,10 +33,10 @@ public class PlatformConnection {
     @Column(nullable = false)
     private PlatformType platform;
 
-    @Column(name = "github_user_id", nullable = false, unique = true)
+    @Column(name = "external_user_id", nullable = false, unique = true)
     private String externalUserId;
 
-    @Column(name = "login", nullable = false, unique = true)
+    @Column(name = "account_login", nullable = false, unique = true)
     private String accountLogin;
 
     @Column

@@ -1,14 +1,19 @@
 import { NavLink } from 'react-router-dom';
 
-const navItems = [
-  { to: '/repositories', label: '저장소' },
-  { to: '/settings/github', label: 'GitHub PAT' },
-];
+import { DEFAULT_PLATFORM } from '@/shared/constants/platform';
+import { platformSettingsPath, repositoriesPath } from '@/shared/lib/routes';
 
-export function MainNavigation() {
+function getNavItems(platform: string) {
+  return [
+    { to: repositoriesPath(platform), label: '저장소' },
+    { to: platformSettingsPath(platform), label: '플랫폼 연결' },
+  ];
+}
+
+export function MainNavigation({ platform = DEFAULT_PLATFORM }: { platform?: string }) {
   return (
     <nav className="nav-list" aria-label="주요 메뉴">
-      {navItems.map((item) => (
+      {getNavItems(platform).map((item) => (
         <NavLink
           key={item.to}
           to={item.to}

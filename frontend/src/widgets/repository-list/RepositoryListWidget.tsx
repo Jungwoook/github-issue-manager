@@ -1,40 +1,42 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { getGitHubTokenStatus } from '@/entities/github/api/githubTokenApi';
+import { getPlatformTokenStatus } from '@/entities/platform-connection/api/platformConnectionApi';
 import { getRepositories, refreshRepositories } from '@/entities/repository/api/repositoryApi';
 import type { Repository } from '@/entities/repository/model/types';
-import { DEFAULT_PLATFORM } from '@/shared/constants/platform';
 import { queryKeys } from '@/shared/constants/queryKeys';
 import { formatDate } from '@/shared/lib/formatDate';
 import { getErrorMessage } from '@/shared/lib/getErrorMessage';
+import { normalizePlatform, repositoryIssuesPath } from '@/shared/lib/routes';
 
 const PAGE_SIZE = 10;
 
 export function RepositoryListWidget() {
+  const { platform } = useParams();
+  const currentPlatform = normalizePlatform(platform);
   const queryClient = useQueryClient();
   const [hasAutoRefreshed, setHasAutoRefreshed] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
   const tokenStatusQuery = useQuery({
-    queryKey: queryKeys.platformTokenStatus(DEFAULT_PLATFORM),
-    queryFn: getGitHubTokenStatus,
+    queryKey: queryKeys.platformTokenStatus(currentPlatform),
+    queryFn: () => getPlatformTokenStatus(currentPlatform),
     retry: false,
   });
 
   const repositoryQuery = useQuery({
-    queryKey: queryKeys.repositories(DEFAULT_PLATFORM),
-    queryFn: getRepositories,
+    queryKey: queryKeys.repositories(currentPlatform),
+    queryFn: () => getRepositories(currentPlatform),
   });
 
   const refreshMutation = useMutation({
-    mutationFn: refreshRepositories,
+    mutationFn: () => refreshRepositories(currentPlatform),
     onSuccess: async () => {
       setHasAutoRefreshed(true);
       setCurrentPage(1);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.repositories(DEFAULT_PLATFORM) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.repositories(currentPlatform) });
     },
   });
 
@@ -59,6 +61,7 @@ export function RepositoryListWidget() {
       refreshMutation.mutate();
     }
   }, [
+    currentPlatform,
     hasAutoRefreshed,
     refreshMutation,
     repositories.length,
@@ -92,8 +95,8 @@ export function RepositoryListWidget() {
       <section className="list-card">
         <div className="card-header">
           <div>
-            <h3 className="section-title">GitHub 저장소 목록</h3>
-            <p className="muted">PAT로 접근 가능한 저장소를 불러오고, 이슈 화면으로 이동할 수 있습니다.</p>
+            <h3 className="section-title">저장소 목록</h3>
+            <p className="muted">현재 플랫폼 연결 기준으로 접근 가능한 저장소를 불러옵니다.</p>
           </div>
           <div className="toolbar-actions">
             <button
@@ -108,28 +111,28 @@ export function RepositoryListWidget() {
         </div>
 
         {!tokenConnected && !tokenStatusQuery.isLoading ? (
-          <div className="info-banner">먼저 GitHub PAT를 등록해야 저장소를 불러올 수 있습니다.</div>
+          <div className="info-banner">먼저 플랫폼 토큰을 등록해야 저장소를 불러올 수 있습니다.</div>
         ) : null}
         {repositoryQuery.isLoading ? <div className="info-banner">저장소를 불러오는 중입니다...</div> : null}
         {repositoryQuery.isError ? (
           <div className="error-banner">저장소를 불러오지 못했습니다. {getErrorMessage(repositoryQuery.error)}</div>
         ) : null}
         {submitError ? <div className="error-banner">{getErrorMessage(submitError)}</div> : null}
-        {refreshMutation.isSuccess ? (
-          <div className="success-banner">저장소 목록을 새로고침했습니다.</div>
-        ) : null}
+        {refreshMutation.isSuccess ? <div className="success-banner">저장소 목록을 새로고침했습니다.</div> : null}
 
         {repositories.length === 0 && tokenConnected && !repositoryQuery.isLoading && !refreshMutation.isPending ? (
-          <div className="empty-state">
-            아직 불러온 저장소가 없습니다. PAT 권한을 확인하고 `저장소 새로고침`을 눌러 GitHub 저장소를 가져오세요.
-          </div>
+          <div className="empty-state">아직 불러온 저장소가 없습니다. 토큰 권한을 확인하고 새로고침을 시도해 주세요.</div>
         ) : null}
 
         {visibleRepositories.length > 0 ? (
           <>
             <div className="repository-list">
               {visibleRepositories.map((repository) => (
-                <RepositoryListItem key={repository.repositoryId} repository={repository} />
+                <RepositoryListItem
+                  key={repository.repositoryId}
+                  platform={currentPlatform}
+                  repository={repository}
+                />
               ))}
             </div>
 
@@ -166,34 +169,29 @@ export function RepositoryListWidget() {
   );
 }
 
-function RepositoryListItem({ repository }: { repository: Repository }) {
+function RepositoryListItem({ repository, platform }: { repository: Repository; platform: string }) {
   return (
     <article className="repository-list-item">
       <div className="repository-list-main">
         <div className="repository-list-header">
           <div className="stack-sm">
             <div className="repository-title-row">
-              <Link className="issue-title-link" to={`/repositories/${repository.repositoryId}/issues`}>
+              <Link className="issue-title-link" to={repositoryIssuesPath(repository.repositoryId, platform)}>
                 {repository.fullName}
               </Link>
               <span className={`tag ${repository.private ? 'priority-high' : 'priority-low'}`}>
                 {repository.private ? '비공개' : '공개'}
               </span>
             </div>
-            <span className="muted">동기화: {formatDate(repository.lastSyncedAt)}</span>
+            <span className="muted">동기화 {formatDate(repository.lastSyncedAt)}</span>
           </div>
 
           <div className="repository-actions">
-            <Link className="button" to={`/repositories/${repository.repositoryId}/issues`}>
+            <Link className="button" to={repositoryIssuesPath(repository.repositoryId, platform)}>
               이슈 보기
             </Link>
-            <a
-              className="button button-ghost"
-              href={repository.webUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              GitHub 열기
+            <a className="button button-ghost" href={repository.webUrl} target="_blank" rel="noreferrer">
+              원격 열기
             </a>
           </div>
         </div>
