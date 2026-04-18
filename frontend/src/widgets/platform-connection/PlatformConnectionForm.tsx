@@ -84,7 +84,7 @@ export function PlatformConnectionForm({ platform = DEFAULT_PLATFORM }: { platfo
 
         {tokenStatusQuery.isLoading ? <div className="info-banner">현재 연결 상태를 불러오는 중입니다...</div> : null}
         {submitError ? <div className="error-banner">{getErrorMessage(submitError)}</div> : null}
-        {registerMutation.isSuccess ? <div className="success-banner">토큰을 등록했고 저장소 화면으로 이동합니다.</div> : null}
+        {registerMutation.isSuccess ? <div className="success-banner">토큰을 등록하고 저장소 화면으로 이동합니다.</div> : null}
         {disconnectMutation.isSuccess ? <div className="success-banner">토큰 연결을 해제했습니다.</div> : null}
 
         <div className="github-status-panel">
@@ -166,7 +166,8 @@ export function PlatformConnectionForm({ platform = DEFAULT_PLATFORM }: { platfo
                 onChange={(event) => setBaseUrl(event.target.value)}
               />
               <p className="field-help">
-                GitLab self-managed 인스턴스를 쓰면 API base URL을 입력합니다. 비워두면 {platformMeta.defaultBaseUrl}을 사용합니다.
+                GitLab self-managed 인스턴스를 쓰는 경우에만 API base URL을 입력합니다. 비워두면 {platformMeta.defaultBaseUrl}
+                를 사용합니다.
               </p>
             </div>
           ) : null}
@@ -189,29 +190,6 @@ export function PlatformConnectionForm({ platform = DEFAULT_PLATFORM }: { platfo
             </button>
           </div>
         </form>
-      </section>
-
-      <section className="list-card">
-        <div className="card-header">
-          <div>
-            <h3 className="section-title">현재 안내</h3>
-            <p className="muted">2차 구현에서는 GitHub와 GitLab 연결 흐름을 같은 화면 구조에서 다룹니다.</p>
-          </div>
-        </div>
-        <div className="page-stack">
-          <div className="detail-card">
-            <h4 className="card-title">지원 플랫폼</h4>
-            <p className="muted">현재: GitHub, GitLab</p>
-          </div>
-          <div className="detail-card">
-            <h4 className="card-title">구조 목표</h4>
-            <p className="muted">플랫폼별 차이는 연결 설정과 안내에 두고 저장소/이슈 흐름은 공통 구조로 유지</p>
-          </div>
-          <div className="detail-card">
-            <h4 className="card-title">다음 단계</h4>
-            <p className="muted">GitLab self-managed 설정과 프로젝트 식별 규칙을 더 정교하게 보강</p>
-          </div>
-        </div>
       </section>
     </div>
   );
