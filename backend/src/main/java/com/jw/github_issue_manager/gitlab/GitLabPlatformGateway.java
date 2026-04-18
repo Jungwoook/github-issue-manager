@@ -1,4 +1,4 @@
-package com.jw.github_issue_manager.github;
+package com.jw.github_issue_manager.gitlab;
 
 import java.util.List;
 
@@ -12,26 +12,26 @@ import com.jw.github_issue_manager.core.remote.RemoteRepository;
 import com.jw.github_issue_manager.core.remote.RemoteUserProfile;
 
 @Component
-public class GitHubPlatformGateway implements PlatformGateway {
+public class GitLabPlatformGateway implements PlatformGateway {
 
-    private final GitHubApiClient gitHubApiClient;
+    private final GitLabApiClient gitLabApiClient;
 
-    public GitHubPlatformGateway(GitHubApiClient gitHubApiClient) {
-        this.gitHubApiClient = gitHubApiClient;
+    public GitLabPlatformGateway(GitLabApiClient gitLabApiClient) {
+        this.gitLabApiClient = gitLabApiClient;
     }
 
     @Override
     public PlatformType getPlatformType() {
-        return PlatformType.GITHUB;
+        return PlatformType.GITLAB;
     }
 
     @Override
     public RemoteUserProfile getAuthenticatedUser(String accessToken, String baseUrl) {
-        GitHubUserProfile profile = gitHubApiClient.getAuthenticatedUser(accessToken);
+        GitLabUserProfile profile = gitLabApiClient.getAuthenticatedUser(accessToken, baseUrl);
         return new RemoteUserProfile(
-            PlatformType.GITHUB,
+            PlatformType.GITLAB,
             profile.id().toString(),
-            profile.login(),
+            profile.username(),
             profile.name(),
             profile.email(),
             profile.avatarUrl()
@@ -40,21 +40,22 @@ public class GitHubPlatformGateway implements PlatformGateway {
 
     @Override
     public List<RemoteRepository> getAccessibleRepositories(String accessToken, String baseUrl) {
-        return gitHubApiClient.getAccessibleRepositories(accessToken).stream()
-            .map(this::toRemoteRepository)
+        GitLabUserProfile profile = gitLabApiClient.getAuthenticatedUser(accessToken, baseUrl);
+        return gitLabApiClient.getAccessibleProjects(accessToken, baseUrl).stream()
+            .map(project -> toRemoteRepository(profile.username(), project))
             .toList();
     }
 
     @Override
     public List<RemoteIssue> getRepositoryIssues(String accessToken, String baseUrl, String ownerKey, String repositoryName) {
-        return gitHubApiClient.getRepositoryIssues(accessToken, ownerKey, repositoryName).stream()
+        return gitLabApiClient.getProjectIssues(accessToken, baseUrl, repositoryName).stream()
             .map(this::toRemoteIssue)
             .toList();
     }
 
     @Override
     public RemoteIssue createIssue(String accessToken, String baseUrl, String ownerKey, String repositoryName, String title, String body) {
-        return toRemoteIssue(gitHubApiClient.createIssue(accessToken, ownerKey, repositoryName, title, body));
+        return toRemoteIssue(gitLabApiClient.createIssue(accessToken, baseUrl, repositoryName, title, body));
     }
 
     @Override
@@ -68,50 +69,42 @@ public class GitHubPlatformGateway implements PlatformGateway {
         String body,
         String state
     ) {
-        return toRemoteIssue(gitHubApiClient.updateIssue(
-            accessToken,
-            ownerKey,
-            repositoryName,
-            Integer.parseInt(issueKey),
-            title,
-            body,
-            state
-        ));
+        return toRemoteIssue(gitLabApiClient.updateIssue(accessToken, baseUrl, repositoryName, issueKey, title, body, state));
     }
 
     @Override
     public List<RemoteComment> getIssueComments(String accessToken, String baseUrl, String ownerKey, String repositoryName, String issueKey) {
-        return gitHubApiClient.getIssueComments(accessToken, ownerKey, repositoryName, Integer.parseInt(issueKey)).stream()
+        return gitLabApiClient.getIssueComments(accessToken, baseUrl, repositoryName, issueKey).stream()
             .map(this::toRemoteComment)
             .toList();
     }
 
     @Override
     public RemoteComment createComment(String accessToken, String baseUrl, String ownerKey, String repositoryName, String issueKey, String body) {
-        return toRemoteComment(gitHubApiClient.createComment(accessToken, ownerKey, repositoryName, Integer.parseInt(issueKey), body));
+        return toRemoteComment(gitLabApiClient.createComment(accessToken, baseUrl, repositoryName, issueKey, body));
     }
 
-    private RemoteRepository toRemoteRepository(GitHubRepositoryInfo repository) {
+    private RemoteRepository toRemoteRepository(String accountLogin, GitLabProjectInfo project) {
         return new RemoteRepository(
-            PlatformType.GITHUB,
-            repository.id().toString(),
-            repository.ownerLogin(),
-            repository.name(),
-            repository.fullName(),
-            repository.description(),
-            repository.isPrivate(),
-            repository.htmlUrl(),
-            repository.defaultBranch(),
-            repository.pushedAt()
+            PlatformType.GITLAB,
+            project.id().toString(),
+            accountLogin,
+            project.pathWithNamespace(),
+            project.pathWithNamespace(),
+            project.description(),
+            project.isPrivate(),
+            project.webUrl(),
+            project.defaultBranch() == null ? "main" : project.defaultBranch(),
+            project.lastActivityAt()
         );
     }
 
-    private RemoteIssue toRemoteIssue(GitHubIssueInfo issue) {
+    private RemoteIssue toRemoteIssue(GitLabIssueInfo issue) {
         return new RemoteIssue(
-            PlatformType.GITHUB,
+            PlatformType.GITLAB,
             issue.id().toString(),
-            null,
-            issue.number().toString(),
+            issue.projectId() == null ? null : issue.projectId().toString(),
+            issue.iid().toString(),
             issue.title(),
             issue.body(),
             issue.state(),
@@ -122,9 +115,9 @@ public class GitHubPlatformGateway implements PlatformGateway {
         );
     }
 
-    private RemoteComment toRemoteComment(GitHubCommentInfo comment) {
+    private RemoteComment toRemoteComment(GitLabCommentInfo comment) {
         return new RemoteComment(
-            PlatformType.GITHUB,
+            PlatformType.GITLAB,
             comment.id().toString(),
             null,
             comment.authorLogin(),

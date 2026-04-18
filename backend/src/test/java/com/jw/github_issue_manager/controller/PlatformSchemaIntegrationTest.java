@@ -19,7 +19,7 @@ class PlatformSchemaIntegrationTest {
 
     @Test
     void platformNeutralSchemaNamesAreCreated() {
-        assertThat(tableColumns("PLATFORM_CONNECTIONS")).contains("EXTERNAL_USER_ID", "ACCOUNT_LOGIN");
+        assertThat(tableColumns("PLATFORM_CONNECTIONS")).contains("EXTERNAL_USER_ID", "ACCOUNT_LOGIN", "BASE_URL");
         assertThat(tableColumns("REPOSITORY_CACHES")).contains("EXTERNAL_ID", "OWNER_KEY", "WEB_URL");
         assertThat(tableColumns("ISSUE_CACHES")).contains("EXTERNAL_ID", "REPOSITORY_EXTERNAL_ID", "NUMBER_OR_KEY");
         assertThat(tableColumns("COMMENT_CACHES")).contains("EXTERNAL_ID", "ISSUE_EXTERNAL_ID");

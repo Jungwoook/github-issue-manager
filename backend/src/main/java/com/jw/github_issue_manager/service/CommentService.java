@@ -56,8 +56,10 @@ public class CommentService {
         var repository = repositoryService.requireAccessibleRepository(platform, repositoryId, session);
         IssueCache issue = issueService.requireIssue(platform, repositoryId, issueNumberOrKey, session);
         String accessToken = authService.requirePlatformAccessToken(platform, session);
+        String baseUrl = authService.requireCurrentConnection(platform, session).getBaseUrl();
         List<RemoteComment> comments = platformGatewayResolver.getGateway(platform).getIssueComments(
             accessToken,
+            baseUrl,
             repository.getOwnerKey(),
             repository.getName(),
             issueNumberOrKey
@@ -84,8 +86,10 @@ public class CommentService {
         var repository = repositoryService.requireAccessibleRepository(platform, repositoryId, session);
         IssueCache issue = issueService.requireIssue(platform, repositoryId, issueNumberOrKey, session);
         String accessToken = authService.requirePlatformAccessToken(platform, session);
+        String baseUrl = authService.requireCurrentConnection(platform, session).getBaseUrl();
         RemoteComment createdComment = platformGatewayResolver.getGateway(platform).createComment(
             accessToken,
+            baseUrl,
             repository.getOwnerKey(),
             repository.getName(),
             issueNumberOrKey,

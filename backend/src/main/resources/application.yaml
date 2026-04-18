@@ -10,3 +10,5 @@ app:
   github:
     api-base-url: ${GITHUB_API_BASE_URL:https://api.github.com}
     pat-encryption-key: ${GITHUB_PAT_ENCRYPTION_KEY:local-dev-pat-key}
+  gitlab:
+    api-base-url: ${GITLAB_API_BASE_URL:https://gitlab.com/api/v4}

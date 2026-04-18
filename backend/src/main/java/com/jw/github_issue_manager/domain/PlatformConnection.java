@@ -48,6 +48,9 @@ public class PlatformConnection {
     @Column
     private String tokenScopes;
 
+    @Column(name = "base_url")
+    private String baseUrl;
+
     @Column
     private LocalDateTime tokenVerifiedAt;
 
@@ -67,7 +70,8 @@ public class PlatformConnection {
         String accountLogin,
         String avatarUrl,
         String accessTokenEncrypted,
-        String tokenScopes
+        String tokenScopes,
+        String baseUrl
     ) {
         this.user = user;
         this.platform = platform;
@@ -76,6 +80,7 @@ public class PlatformConnection {
         this.avatarUrl = avatarUrl;
         this.accessTokenEncrypted = accessTokenEncrypted;
         this.tokenScopes = tokenScopes;
+        this.baseUrl = baseUrl;
     }
 
     @PrePersist
@@ -143,6 +148,14 @@ public class PlatformConnection {
 
     public LocalDateTime getTokenVerifiedAt() {
         return tokenVerifiedAt;
+    }
+
+    public String getBaseUrl() {
+        return baseUrl;
+    }
+
+    public void setBaseUrl(String baseUrl) {
+        this.baseUrl = baseUrl;
     }
 
     public LocalDateTime getConnectedAt() {

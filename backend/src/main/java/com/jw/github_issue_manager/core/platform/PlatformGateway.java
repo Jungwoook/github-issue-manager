@@ -11,16 +11,17 @@ public interface PlatformGateway {
 
     PlatformType getPlatformType();
 
-    RemoteUserProfile getAuthenticatedUser(String accessToken);
+    RemoteUserProfile getAuthenticatedUser(String accessToken, String baseUrl);
 
-    List<RemoteRepository> getAccessibleRepositories(String accessToken);
+    List<RemoteRepository> getAccessibleRepositories(String accessToken, String baseUrl);
 
-    List<RemoteIssue> getRepositoryIssues(String accessToken, String ownerKey, String repositoryName);
+    List<RemoteIssue> getRepositoryIssues(String accessToken, String baseUrl, String ownerKey, String repositoryName);
 
-    RemoteIssue createIssue(String accessToken, String ownerKey, String repositoryName, String title, String body);
+    RemoteIssue createIssue(String accessToken, String baseUrl, String ownerKey, String repositoryName, String title, String body);
 
     RemoteIssue updateIssue(
         String accessToken,
+        String baseUrl,
         String ownerKey,
         String repositoryName,
         String issueKey,
@@ -29,7 +30,7 @@ public interface PlatformGateway {
         String state
     );
 
-    List<RemoteComment> getIssueComments(String accessToken, String ownerKey, String repositoryName, String issueKey);
+    List<RemoteComment> getIssueComments(String accessToken, String baseUrl, String ownerKey, String repositoryName, String issueKey);
 
-    RemoteComment createComment(String accessToken, String ownerKey, String repositoryName, String issueKey, String body);
+    RemoteComment createComment(String accessToken, String baseUrl, String ownerKey, String repositoryName, String issueKey, String body);
 }

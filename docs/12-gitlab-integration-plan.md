@@ -185,3 +185,103 @@
 - 서비스 계층은 그대로 두고 GitLab 차이는 gateway와 config로 흡수한다.
 - 1차 목표는 "GitLab 지원 완료"보다 "공통 구조가 두 번째 플랫폼까지 버티는지 검증"에 둔다.
 - self-managed GitLab은 2차 확장 과제로 미룬다.
+
+## 11. Phase 2 Scope
+
+### 11.1 목표
+
+- 1차에서 만든 GitLab 백엔드 연동을 실제 사용자 흐름에서 사용할 수 있게 확장한다.
+- GitLab.com 기준 최소 연동에서 멈추지 않고, 설정/표시/운영 차이를 공통 구조 안에서 안정화한다.
+- GitLab 추가가 일회성 예외 구현이 아니라 다음 플랫폼 확장의 기준이 되도록 만든다.
+
+### 11.2 2차 구현 범위
+
+- 플랫폼 연결 계약 확장
+  - 연결 요청/응답에 `baseUrl` 확장
+  - GitLab 미입력 시 기본값 `https://gitlab.com/api/v4` 처리
+  - 추후 self-managed 입력 가능 구조 확보
+- 프로젝트 식별자/표시 모델 정리
+  - 조회용 식별자와 표시용 이름 분리
+  - `project id`, `path_with_namespace`, 사용자 표시 문자열 역할 고정
+  - 현재 `ownerKey`와 접근 제어 전제 재검토
+- 프론트 플랫폼 연결 화면 확장
+  - GitLab 선택지 표시
+  - GitLab PAT 안내 문구 분리
+  - 필요 시 고급 설정으로 base URL 입력 추가
+- 프론트 프로젝트/이슈 흐름 연결
+  - GitLab 프로젝트 목록 조회
+  - GitLab 이슈 목록/상세/생성/수정/댓글 흐름 연결
+  - `numberOrKey = iid` 기준 라우트와 화면 표시 확인
+- 에러/운영 메시지 보강
+  - GitLab 인증 실패, 권한 부족, 잘못된 base URL 상황 메시지 정리
+  - GitHub/GitLab별 연결 가이드 분리
+- 테스트 보강
+  - GitLab 연결 API 통합 테스트
+  - 프로젝트 path / `iid` / base URL 관련 회귀 테스트
+  - 프론트 플랫폼별 렌더링과 라우트 테스트
+
+### 11.3 2차 선행 확인 사항
+
+- 현재 `RepositoryService.requireAccessibleRepository`가 `ownerKey == accountLogin` 전제를 갖고 있는지 점검
+- GitLab group/subgroup 프로젝트를 현재 캐시 구조에서 안전하게 다룰 수 있는지 확인
+- `PlatformConnection`에 base URL을 저장할지, 별도 설정 객체로 분리할지 결정
+- 프론트에서 GitHub 전용 문구와 query key가 완전히 플랫폼 중립 구조인지 확인
+
+### 11.4 2차에서 해결할 핵심 문제
+
+- 접근 가능한 프로젝트의 소유자와 로그인 사용자가 다를 때도 조회/상세가 동작해야 한다.
+- GitLab `path_with_namespace`를 API 호출용으로 쓰면서도 UI에는 읽기 좋은 이름을 유지해야 한다.
+- self-managed GitLab을 열어둘 수 있는 설정 구조가 필요하지만, 2차에서도 기본 기준은 GitLab.com이어야 한다.
+- GitLab 전용 예외 상황이 서비스 계층이 아니라 연결/설정/어댑터 계층에서 처리되어야 한다.
+
+### 11.5 2차 제외 범위
+
+- merge request 연동
+- labels, milestones, assignees 같은 GitLab 전용 확장 기능
+- project/group access token 전용 관리 UI
+- 여러 GitLab 연결 계정을 동시에 관리하는 기능
+- 운영 문서 수준의 self-managed 설치/배포 가이드
+
+### 11.6 권장 구현 순서
+
+1. `baseUrl` 포함 플랫폼 연결 계약 확정
+2. 프로젝트 식별자/접근 제어 규칙 정리
+3. GitLab 연결 화면과 안내 문구 반영
+4. GitLab 프로젝트/이슈/댓글 프론트 연결
+5. GitLab 전용 오류/예외 메시지 보강
+6. 통합 테스트와 회귀 테스트 보강
+
+### 11.7 완료 기준
+
+- 사용자가 프론트에서 GitLab 연결을 생성하고 프로젝트 목록을 조회할 수 있다.
+- GitLab 프로젝트에서 이슈 목록, 상세, 생성, 수정, 댓글 흐름이 동작한다.
+- GitHub 기존 흐름에 회귀가 없다.
+- GitLab 특성인 `baseUrl`, `path_with_namespace`, `iid` 처리가 문서와 코드에서 일관된다.
+
+## 12. Backend Follow-up
+
+### 12.1 추가로 정리할 필요가 있는 항목
+
+- 연결 식별자 유니크 제약 재설계
+  - 현재 `PlatformConnection.externalUserId`, `accountLogin`은 단일 컬럼 unique 기준이다.
+  - GitLab self-managed까지 열어두면 같은 `externalUserId`나 `accountLogin`이 다른 인스턴스에서 충돌할 수 있다.
+  - 장기적으로는 `platform + baseUrl + externalUserId` 또는 이에 준하는 복합 식별 기준이 필요하다.
+- 접근 제어 기준 재설계
+  - 현재 `RepositoryService.requireAccessibleRepository`는 `ownerKey == accountLogin` 전제를 사용한다.
+  - GitLab group/subgroup 프로젝트나 GitHub organization 저장소처럼 "접근 가능하지만 owner가 다른 리소스"를 안정적으로 처리하기 어렵다.
+  - 사용자 연결과 저장소 접근 권한을 분리한 모델이 필요하다.
+- 저장소 캐시 모델 정리
+  - 현재 GitLab은 API 호출용 `path_with_namespace`를 `name/fullName`에 싣는 방식으로 동작한다.
+  - 장기적으로는 `displayName`, `pathWithNamespace`, `ownerKey`, `repositorySlug` 역할을 분리하는 것이 안전하다.
+- base URL 정규화 보강
+  - 현재는 입력값을 그대로 base URL로 저장한다.
+  - self-managed 사용 시 `/api/v4`를 포함하지 않은 URL, trailing slash, 잘못된 scheme 등을 정규화하거나 검증할 필요가 있다.
+- 연결/조회 통합 테스트 보강
+  - 현재는 gateway 단위와 일부 서비스 테스트 중심이다.
+  - `token 등록 -> 저장소 refresh -> 이슈/댓글 조회`까지 GitLab 시나리오를 통합 테스트로 보강하면 회귀를 줄일 수 있다.
+
+### 12.2 현재 기준 판단
+
+- 지금 상태는 "GitLab 2차 흐름 검증용"으로는 충분하다.
+- 다만 위 항목들은 실제 사용자/운영 환경에서 리소스 소유 구조와 self-managed 케이스를 다루기 위해 후속 백엔드 작업으로 남겨두는 것이 좋다.
+- 따라서 PR을 올리는 것은 가능하지만, 병합 전 또는 다음 단계에서 이 후속 백엔드 항목을 별도 이슈처럼 관리하는 것을 권장한다.

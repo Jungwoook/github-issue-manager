@@ -9,6 +9,7 @@ public record PlatformTokenStatusResponse(
     boolean connected,
     String accountLogin,
     String tokenScopes,
+    String baseUrl,
     LocalDateTime tokenVerifiedAt
 ) {
 }

@@ -1,7 +1,7 @@
-import { DEFAULT_PLATFORM } from '@/shared/constants/platform';
+import { DEFAULT_PLATFORM, normalizePlatformValue } from '@/shared/constants/platform';
 
 export function normalizePlatform(platform?: string) {
-  return platform || DEFAULT_PLATFORM;
+  return normalizePlatformValue(platform) || DEFAULT_PLATFORM;
 }
 
 export function platformSettingsPath(platform?: string) {

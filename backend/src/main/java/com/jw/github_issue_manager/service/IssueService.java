@@ -65,8 +65,10 @@ public class IssueService {
     public List<IssueSummaryResponse> refreshIssues(PlatformType platform, String repositoryId, HttpSession session) {
         RepositoryCache repository = repositoryService.requireAccessibleRepository(platform, repositoryId, session);
         String accessToken = authService.requirePlatformAccessToken(platform, session);
+        String baseUrl = authService.requireCurrentConnection(platform, session).getBaseUrl();
         List<RemoteIssue> issues = platformGatewayResolver.getGateway(platform).getRepositoryIssues(
             accessToken,
+            baseUrl,
             repository.getOwnerKey(),
             repository.getName()
         );
@@ -85,8 +87,10 @@ public class IssueService {
     public IssueDetailResponse createIssue(PlatformType platform, String repositoryId, CreateIssueRequest request, HttpSession session) {
         RepositoryCache repository = repositoryService.requireAccessibleRepository(platform, repositoryId, session);
         String accessToken = authService.requirePlatformAccessToken(platform, session);
+        String baseUrl = authService.requireCurrentConnection(platform, session).getBaseUrl();
         RemoteIssue createdIssue = platformGatewayResolver.getGateway(platform).createIssue(
             accessToken,
+            baseUrl,
             repository.getOwnerKey(),
             repository.getName(),
             request.title(),
@@ -119,9 +123,11 @@ public class IssueService {
         RepositoryCache repository = repositoryService.requireAccessibleRepository(platform, repositoryId, session);
         IssueCache currentIssue = requireIssue(platform, repositoryId, issueNumberOrKey, session);
         String accessToken = authService.requirePlatformAccessToken(platform, session);
+        String baseUrl = authService.requireCurrentConnection(platform, session).getBaseUrl();
 
         RemoteIssue updatedIssue = platformGatewayResolver.getGateway(platform).updateIssue(
             accessToken,
+            baseUrl,
             repository.getOwnerKey(),
             repository.getName(),
             issueNumberOrKey,
@@ -144,8 +150,10 @@ public class IssueService {
     public void deleteIssue(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
         RepositoryCache repository = repositoryService.requireAccessibleRepository(platform, repositoryId, session);
         String accessToken = authService.requirePlatformAccessToken(platform, session);
+        String baseUrl = authService.requireCurrentConnection(platform, session).getBaseUrl();
         platformGatewayResolver.getGateway(platform).updateIssue(
             accessToken,
+            baseUrl,
             repository.getOwnerKey(),
             repository.getName(),
             issueNumberOrKey,

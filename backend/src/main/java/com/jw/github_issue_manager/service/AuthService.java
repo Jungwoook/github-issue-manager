@@ -1,5 +1,7 @@
 package com.jw.github_issue_manager.service;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 
 import org.springframework.stereotype.Service;
@@ -45,16 +47,17 @@ public class AuthService {
 
     @Transactional
     public MeResponse registerPlatformToken(PlatformType platform, RegisterPlatformTokenRequest request, HttpSession session) {
+        String baseUrl = resolvePlatformBaseUrl(platform, request.baseUrl());
         RemoteUserProfile userProfile = platformGatewayResolver.getGateway(platform)
-            .getAuthenticatedUser(request.accessToken());
+            .getAuthenticatedUser(request.accessToken(), baseUrl);
         String encryptedToken = patCryptoService.encrypt(request.accessToken());
         LocalDateTime now = LocalDateTime.now();
         PlatformConnection connection = platformConnectionRepository.findByPlatformAndExternalUserId(
                 platform,
                 userProfile.externalUserId()
             )
-            .map(existing -> updateExistingConnection(existing, userProfile, encryptedToken, now))
-            .orElseGet(() -> createConnection(platform, userProfile, encryptedToken, now));
+            .map(existing -> updateExistingConnection(platform, existing, userProfile, encryptedToken, baseUrl, now))
+            .orElseGet(() -> createConnection(platform, userProfile, encryptedToken, baseUrl, now));
 
         connection.touchAuthentication();
         session.setAttribute(CURRENT_USER_ID, connection.getUser().getId());
@@ -76,6 +79,7 @@ public class AuthService {
             connection.getAccountLogin(),
             connection.getAvatarUrl(),
             connection.getTokenScopes(),
+            connection.getBaseUrl(),
             connection.getConnectedAt(),
             connection.getLastAuthenticatedAt()
         );
@@ -89,6 +93,7 @@ public class AuthService {
             connection.getAccessTokenEncrypted() != null && !connection.getAccessTokenEncrypted().isBlank(),
             connection.getAccountLogin(),
             connection.getTokenScopes(),
+            connection.getBaseUrl(),
             connection.getTokenVerifiedAt()
         );
     }
@@ -138,9 +143,11 @@ public class AuthService {
     }
 
     private PlatformConnection updateExistingConnection(
+        PlatformType platform,
         PlatformConnection connection,
         RemoteUserProfile userProfile,
         String encryptedToken,
+        String baseUrl,
         LocalDateTime verifiedAt
     ) {
         User user = connection.getUser();
@@ -148,7 +155,8 @@ public class AuthService {
         user.setEmail(userProfile.email());
         connection.setAccountLogin(userProfile.login());
         connection.setAvatarUrl(userProfile.avatarUrl());
-        connection.setTokenScopes("fine-grained");
+        connection.setTokenScopes(defaultTokenScopes(platform));
+        connection.setBaseUrl(baseUrl);
         connection.setAccessTokenEncrypted(encryptedToken);
         connection.markTokenVerified(verifiedAt);
         return connection;
@@ -158,6 +166,7 @@ public class AuthService {
         PlatformType platform,
         RemoteUserProfile userProfile,
         String encryptedToken,
+        String baseUrl,
         LocalDateTime verifiedAt
     ) {
         User user = userRepository.save(new User(resolveDisplayName(userProfile), userProfile.email()));
@@ -168,10 +177,66 @@ public class AuthService {
             userProfile.login(),
             userProfile.avatarUrl(),
             encryptedToken,
-            "fine-grained"
+            defaultTokenScopes(platform),
+            baseUrl
         );
         connection.markTokenVerified(verifiedAt);
         return platformConnectionRepository.save(connection);
+    }
+
+    public String resolvePlatformBaseUrl(PlatformType platform, String requestedBaseUrl) {
+        if (platform == PlatformType.GITLAB) {
+            if (requestedBaseUrl == null || requestedBaseUrl.isBlank()) {
+                return "https://gitlab.com/api/v4";
+            }
+            return normalizeGitLabBaseUrl(requestedBaseUrl);
+        }
+        return null;
+    }
+
+    private String normalizeGitLabBaseUrl(String requestedBaseUrl) {
+        try {
+            URI uri = new URI(requestedBaseUrl.trim());
+
+            if (!"https".equalsIgnoreCase(uri.getScheme())) {
+                throw new IllegalArgumentException("GitLab baseUrl must use HTTPS.");
+            }
+            if (uri.getHost() == null || uri.getHost().isBlank()) {
+                throw new IllegalArgumentException("GitLab baseUrl must include a valid host.");
+            }
+            if (uri.getQuery() != null || uri.getFragment() != null) {
+                throw new IllegalArgumentException("GitLab baseUrl must not include query parameters or fragments.");
+            }
+
+            String path = uri.getPath();
+            if (path == null || path.isBlank() || "/".equals(path)) {
+                path = "/api/v4";
+            } else {
+                path = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+                if (!path.endsWith("/api/v4")) {
+                    path = path + "/api/v4";
+                }
+            }
+
+            return new URI(
+                uri.getScheme().toLowerCase(),
+                uri.getUserInfo(),
+                uri.getHost().toLowerCase(),
+                uri.getPort(),
+                path,
+                null,
+                null
+            ).toString();
+        } catch (URISyntaxException | IllegalArgumentException exception) {
+            throw new IllegalArgumentException("GitLab baseUrl must be a valid HTTPS API base URL.", exception);
+        }
+    }
+
+    private String defaultTokenScopes(PlatformType platform) {
+        return switch (platform) {
+            case GITHUB -> "fine-grained";
+            case GITLAB -> "api";
+        };
     }
 
     private String resolveDisplayName(RemoteUserProfile userProfile) {
