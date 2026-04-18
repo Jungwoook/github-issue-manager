@@ -188,7 +188,7 @@ export function IssueListWidget() {
                           disabled={deleteIssueMutation.isPending}
                           onClick={() => deleteIssueMutation.mutate(issue.numberOrKey)}
                         >
-                          삭제
+                          닫기
                         </button>
                       </div>
                     </td>

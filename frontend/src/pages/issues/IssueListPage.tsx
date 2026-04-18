@@ -1,8 +1,8 @@
 import { useParams } from 'react-router-dom';
 
 import { CreateIssueButton } from '@/features/issue/create-issue/ui/CreateIssueButton';
-import { PageHeader } from '@/shared/ui/PageHeader';
 import { normalizePlatform } from '@/shared/lib/routes';
+import { PageHeader } from '@/shared/ui/PageHeader';
 import { IssueListWidget } from '@/widgets/issue-list/IssueListWidget';
 
 export function IssueListPage() {
