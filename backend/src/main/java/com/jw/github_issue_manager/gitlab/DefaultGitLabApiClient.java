@@ -1,5 +1,6 @@
 package com.jw.github_issue_manager.gitlab;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -71,9 +72,10 @@ public class DefaultGitLabApiClient implements GitLabApiClient {
 
     @Override
     public List<GitLabIssueInfo> getProjectIssues(String personalAccessToken, String apiBaseUrl, String projectPath) {
-        String uri = UriComponentsBuilder.fromUriString(projectApiPath(apiBaseUrl, projectPath) + "/issues")
+        String uri = UriComponentsBuilder.fromUri(projectApiUri(apiBaseUrl, projectPath, "/issues"))
             .queryParam("state", "all")
             .queryParam("per_page", "100")
+            .build(true)
             .toUriString();
         GitLabIssueResponse[] response = apiRequestAbsolute(uri, personalAccessToken, GitLabIssueResponse[].class);
         if (response == null) {
@@ -87,7 +89,7 @@ public class DefaultGitLabApiClient implements GitLabApiClient {
     @Override
     public GitLabIssueInfo createIssue(String personalAccessToken, String apiBaseUrl, String projectPath, String title, String body) {
         GitLabIssueResponse response = restClient.post()
-            .uri(projectApiPath(apiBaseUrl, projectPath) + "/issues")
+            .uri(projectApiUri(apiBaseUrl, projectPath, "/issues"))
             .header("PRIVATE-TOKEN", personalAccessToken)
             .contentType(MediaType.APPLICATION_JSON)
             .body(Map.of("title", title, "description", body == null ? "" : body))
@@ -118,7 +120,7 @@ public class DefaultGitLabApiClient implements GitLabApiClient {
         }
 
         GitLabIssueResponse response = restClient.put()
-            .uri(projectApiPath(apiBaseUrl, projectPath) + "/issues/" + issueIid)
+            .uri(projectApiUri(apiBaseUrl, projectPath, "/issues/" + issueIid))
             .header("PRIVATE-TOKEN", personalAccessToken)
             .contentType(MediaType.APPLICATION_JSON)
             .body(payload)
@@ -129,9 +131,11 @@ public class DefaultGitLabApiClient implements GitLabApiClient {
 
     @Override
     public List<GitLabCommentInfo> getIssueComments(String personalAccessToken, String apiBaseUrl, String projectPath, String issueIid) {
-        GitLabNoteResponse[] response = apiRequest(
-            apiBaseUrl,
-            "/projects/" + encodeProjectPath(projectPath) + "/issues/" + issueIid + "/notes",
+        String uri = UriComponentsBuilder.fromUri(projectApiUri(apiBaseUrl, projectPath, "/issues/" + issueIid + "/notes"))
+            .build(true)
+            .toUriString();
+        GitLabNoteResponse[] response = apiRequestAbsolute(
+            uri,
             personalAccessToken,
             GitLabNoteResponse[].class
         );
@@ -147,7 +151,7 @@ public class DefaultGitLabApiClient implements GitLabApiClient {
     @Override
     public GitLabCommentInfo createComment(String personalAccessToken, String apiBaseUrl, String projectPath, String issueIid, String body) {
         GitLabNoteResponse response = restClient.post()
-            .uri(projectApiPath(apiBaseUrl, projectPath) + "/issues/" + issueIid + "/notes")
+            .uri(projectApiUri(apiBaseUrl, projectPath, "/issues/" + issueIid + "/notes"))
             .header("PRIVATE-TOKEN", personalAccessToken)
             .contentType(MediaType.APPLICATION_JSON)
             .body(Map.of("body", body))
@@ -158,6 +162,10 @@ public class DefaultGitLabApiClient implements GitLabApiClient {
 
     private String projectApiPath(String apiBaseUrl, String projectPath) {
         return resolveApiBaseUrl(apiBaseUrl) + "/projects/" + encodeProjectPath(projectPath);
+    }
+
+    private URI projectApiUri(String apiBaseUrl, String projectPath, String suffix) {
+        return URI.create(projectApiPath(apiBaseUrl, projectPath) + suffix);
     }
 
     private String encodeProjectPath(String projectPath) {
