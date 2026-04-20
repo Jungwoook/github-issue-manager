@@ -61,12 +61,10 @@ public class DefaultGitLabApiClient implements GitLabApiClient {
                 project.id(),
                 project.pathWithNamespace(),
                 project.name(),
-                project.description(),
-                "private".equalsIgnoreCase(project.visibility()),
-                project.webUrl(),
-                project.defaultBranch(),
-                toLocalDateTime(project.lastActivityAt())
-            ))
+            project.description(),
+            "private".equalsIgnoreCase(project.visibility()),
+            project.webUrl()
+        ))
             .toList();
     }
 
@@ -263,9 +261,7 @@ public class DefaultGitLabApiClient implements GitLabApiClient {
         @JsonProperty("path_with_namespace") String pathWithNamespace,
         String description,
         String visibility,
-        @JsonProperty("web_url") String webUrl,
-        @JsonProperty("default_branch") String defaultBranch,
-        @JsonProperty("last_activity_at") String lastActivityAt
+        @JsonProperty("web_url") String webUrl
     ) {
     }
 

@@ -104,12 +104,12 @@ public class IssueService {
             "Issue created in cache."
         );
 
-        return toDetailResponse(issue);
+        return toDetailResponse(issue, repositoryId);
     }
 
     @Transactional(readOnly = true)
     public IssueDetailResponse getIssue(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
-        return toDetailResponse(requireIssue(platform, repositoryId, issueNumberOrKey, session));
+        return toDetailResponse(requireIssue(platform, repositoryId, issueNumberOrKey, session), repositoryId);
     }
 
     @Transactional
@@ -143,7 +143,7 @@ public class IssueService {
             "Issue cache updated."
         );
 
-        return toDetailResponse(issue);
+        return toDetailResponse(issue, repositoryId);
     }
 
     @Transactional
@@ -241,11 +241,11 @@ public class IssueService {
         );
     }
 
-    private IssueDetailResponse toDetailResponse(IssueCache issue) {
+    private IssueDetailResponse toDetailResponse(IssueCache issue, String repositoryId) {
         return new IssueDetailResponse(
             issue.getPlatform(),
             issue.getExternalId(),
-            issue.getRepositoryExternalId(),
+            repositoryId,
             issue.getNumberOrKey(),
             issue.getTitle(),
             issue.getBody(),

@@ -47,12 +47,6 @@ public class RepositoryCache {
     private String webUrl;
 
     @Column(nullable = false)
-    private String defaultBranch;
-
-    @Column
-    private LocalDateTime lastPushedAt;
-
-    @Column(nullable = false)
     private LocalDateTime lastSyncedAt;
 
     protected RepositoryCache() {
@@ -67,8 +61,6 @@ public class RepositoryCache {
         String description,
         boolean isPrivate,
         String webUrl,
-        String defaultBranch,
-        LocalDateTime lastPushedAt,
         LocalDateTime lastSyncedAt
     ) {
         this.platform = platform;
@@ -79,8 +71,6 @@ public class RepositoryCache {
         this.description = description;
         this.isPrivate = isPrivate;
         this.webUrl = webUrl;
-        this.defaultBranch = defaultBranch;
-        this.lastPushedAt = lastPushedAt;
         this.lastSyncedAt = lastSyncedAt;
     }
 
@@ -88,15 +78,11 @@ public class RepositoryCache {
         String description,
         boolean isPrivate,
         String webUrl,
-        String defaultBranch,
-        LocalDateTime lastPushedAt,
         LocalDateTime lastSyncedAt
     ) {
         this.description = description;
         this.isPrivate = isPrivate;
         this.webUrl = webUrl;
-        this.defaultBranch = defaultBranch;
-        this.lastPushedAt = lastPushedAt;
         this.lastSyncedAt = lastSyncedAt;
     }
 
@@ -134,14 +120,6 @@ public class RepositoryCache {
 
     public String getWebUrl() {
         return webUrl;
-    }
-
-    public String getDefaultBranch() {
-        return defaultBranch;
-    }
-
-    public LocalDateTime getLastPushedAt() {
-        return lastPushedAt;
     }
 
     public LocalDateTime getLastSyncedAt() {

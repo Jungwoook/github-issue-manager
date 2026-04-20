@@ -95,8 +95,6 @@ public class RepositoryService {
                     repositoryInfo.description(),
                     repositoryInfo.isPrivate(),
                     repositoryInfo.webUrl(),
-                    repositoryInfo.defaultBranch(),
-                    repositoryInfo.pushedAt(),
                     now
                 ),
                 () -> repositoryCacheRepository.save(
@@ -109,8 +107,6 @@ public class RepositoryService {
                         repositoryInfo.description(),
                         repositoryInfo.isPrivate(),
                         repositoryInfo.webUrl(),
-                        repositoryInfo.defaultBranch(),
-                        repositoryInfo.pushedAt(),
                         now
                     )
                 )

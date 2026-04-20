@@ -9,7 +9,6 @@ public record PlatformConnectionResponse(
     String externalUserId,
     String accountLogin,
     String avatarUrl,
-    String tokenScopes,
     String baseUrl,
     LocalDateTime connectedAt,
     LocalDateTime lastAuthenticatedAt

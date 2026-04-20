@@ -182,9 +182,7 @@ class ApiFlowIntegrationTest {
                 "tester/github-issue-manager",
                 "GitHub issue manager",
                 false,
-                "https://github.com/tester/github-issue-manager",
-                "main",
-                LocalDateTime.now().minusHours(1)
+                "https://github.com/tester/github-issue-manager"
             ));
         }
 

@@ -45,9 +45,6 @@ public class PlatformConnection {
     @Column
     private String accessTokenEncrypted;
 
-    @Column
-    private String tokenScopes;
-
     @Column(name = "base_url")
     private String baseUrl;
 
@@ -70,7 +67,6 @@ public class PlatformConnection {
         String accountLogin,
         String avatarUrl,
         String accessTokenEncrypted,
-        String tokenScopes,
         String baseUrl
     ) {
         this.user = user;
@@ -79,7 +75,6 @@ public class PlatformConnection {
         this.accountLogin = accountLogin;
         this.avatarUrl = avatarUrl;
         this.accessTokenEncrypted = accessTokenEncrypted;
-        this.tokenScopes = tokenScopes;
         this.baseUrl = baseUrl;
     }
 
@@ -136,14 +131,6 @@ public class PlatformConnection {
 
     public void setAccessTokenEncrypted(String accessTokenEncrypted) {
         this.accessTokenEncrypted = accessTokenEncrypted;
-    }
-
-    public String getTokenScopes() {
-        return tokenScopes;
-    }
-
-    public void setTokenScopes(String tokenScopes) {
-        this.tokenScopes = tokenScopes;
     }
 
     public LocalDateTime getTokenVerifiedAt() {

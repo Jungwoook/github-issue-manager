@@ -52,7 +52,7 @@ class AuthServicePlatformMetadataTest {
     private AuthService authService;
 
     @Test
-    void storesGitLabTokenScopeMetadataWhenConnectingGitLab() {
+    void storesGitLabBaseUrlWhenConnectingGitLab() {
         RemoteUserProfile profile = new RemoteUserProfile(
             PlatformType.GITLAB,
             "42",
@@ -73,7 +73,6 @@ class AuthServicePlatformMetadataTest {
         ArgumentCaptor<PlatformConnection> captor = ArgumentCaptor.forClass(PlatformConnection.class);
         verify(platformConnectionRepository).save(captor.capture());
         assertThat(captor.getValue().getPlatform()).isEqualTo(PlatformType.GITLAB);
-        assertThat(captor.getValue().getTokenScopes()).isEqualTo("api");
         assertThat(captor.getValue().getBaseUrl()).isEqualTo("https://gitlab.com/api/v4");
     }
 

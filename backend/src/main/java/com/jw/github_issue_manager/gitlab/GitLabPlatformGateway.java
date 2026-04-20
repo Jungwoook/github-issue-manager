@@ -93,9 +93,7 @@ public class GitLabPlatformGateway implements PlatformGateway {
             project.pathWithNamespace(),
             project.description(),
             project.isPrivate(),
-            project.webUrl(),
-            project.defaultBranch() == null ? "main" : project.defaultBranch(),
-            project.lastActivityAt()
+            project.webUrl()
         );
     }
 
@@ -103,7 +101,6 @@ public class GitLabPlatformGateway implements PlatformGateway {
         return new RemoteIssue(
             PlatformType.GITLAB,
             issue.id().toString(),
-            issue.projectId() == null ? null : issue.projectId().toString(),
             issue.iid().toString(),
             issue.title(),
             issue.body(),
@@ -119,7 +116,6 @@ public class GitLabPlatformGateway implements PlatformGateway {
         return new RemoteComment(
             PlatformType.GITLAB,
             comment.id().toString(),
-            null,
             comment.authorLogin(),
             comment.body(),
             comment.createdAt(),

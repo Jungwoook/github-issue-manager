@@ -8,8 +8,6 @@ public record GitLabProjectInfo(
     String name,
     String description,
     boolean isPrivate,
-    String webUrl,
-    String defaultBranch,
-    LocalDateTime lastActivityAt
+    String webUrl
 ) {
 }

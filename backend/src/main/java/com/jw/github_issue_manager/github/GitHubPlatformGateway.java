@@ -100,9 +100,7 @@ public class GitHubPlatformGateway implements PlatformGateway {
             repository.fullName(),
             repository.description(),
             repository.isPrivate(),
-            repository.htmlUrl(),
-            repository.defaultBranch(),
-            repository.pushedAt()
+            repository.htmlUrl()
         );
     }
 
@@ -110,7 +108,6 @@ public class GitHubPlatformGateway implements PlatformGateway {
         return new RemoteIssue(
             PlatformType.GITHUB,
             issue.id().toString(),
-            null,
             issue.number().toString(),
             issue.title(),
             issue.body(),
@@ -126,7 +123,6 @@ public class GitHubPlatformGateway implements PlatformGateway {
         return new RemoteComment(
             PlatformType.GITHUB,
             comment.id().toString(),
-            null,
             comment.authorLogin(),
             comment.body(),
             comment.createdAt(),

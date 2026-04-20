@@ -1,7 +1,5 @@
 package com.jw.github_issue_manager.core.remote;
 
-import java.time.LocalDateTime;
-
 import com.jw.github_issue_manager.core.platform.PlatformType;
 
 public record RemoteRepository(
@@ -12,8 +10,6 @@ public record RemoteRepository(
     String fullName,
     String description,
     boolean isPrivate,
-    String webUrl,
-    String defaultBranch,
-    LocalDateTime pushedAt
+    String webUrl
 ) {
 }

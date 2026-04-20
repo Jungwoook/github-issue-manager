@@ -52,9 +52,7 @@ class GitLabPlatformGatewayTest {
                 "project-a",
                 "Project A",
                 true,
-                "https://gitlab.com/group/sub/project-a",
-                "main",
-                LocalDateTime.of(2026, 4, 18, 9, 0)
+                "https://gitlab.com/group/sub/project-a"
             )));
 
         List<RemoteRepository> repositories = gitLabPlatformGateway.getAccessibleRepositories("token", "https://gitlab.example.com/api/v4");
@@ -108,7 +106,6 @@ class GitLabPlatformGatewayTest {
         verify(gitLabApiClient).getProjectIssues("token", "https://gitlab.example.com/api/v4", "group/sub/project-a");
         verify(gitLabApiClient).getIssueComments("token", "https://gitlab.example.com/api/v4", "group/sub/project-a", "7");
         assertThat(issues.get(0).numberOrKey()).isEqualTo("7");
-        assertThat(issues.get(0).repositoryExternalId()).isEqualTo("25");
         assertThat(comments.get(0).externalId()).isEqualTo("501");
     }
 }

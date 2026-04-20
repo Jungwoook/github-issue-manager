@@ -78,7 +78,6 @@ public class AuthService {
             connection.getExternalUserId(),
             connection.getAccountLogin(),
             connection.getAvatarUrl(),
-            connection.getTokenScopes(),
             connection.getBaseUrl(),
             connection.getConnectedAt(),
             connection.getLastAuthenticatedAt()
@@ -92,7 +91,6 @@ public class AuthService {
             connection.getPlatform(),
             connection.getAccessTokenEncrypted() != null && !connection.getAccessTokenEncrypted().isBlank(),
             connection.getAccountLogin(),
-            connection.getTokenScopes(),
             connection.getBaseUrl(),
             connection.getTokenVerifiedAt()
         );
@@ -102,7 +100,6 @@ public class AuthService {
     public void disconnectPlatformToken(PlatformType platform, HttpSession session) {
         PlatformConnection connection = requireCurrentConnection(platform, session);
         connection.setAccessTokenEncrypted(null);
-        connection.setTokenScopes(null);
 
         Object currentPlatform = session.getAttribute(CURRENT_PLATFORM);
         if (platform.name().equals(currentPlatform)) {
@@ -155,7 +152,6 @@ public class AuthService {
         user.setEmail(userProfile.email());
         connection.setAccountLogin(userProfile.login());
         connection.setAvatarUrl(userProfile.avatarUrl());
-        connection.setTokenScopes(defaultTokenScopes(platform));
         connection.setBaseUrl(baseUrl);
         connection.setAccessTokenEncrypted(encryptedToken);
         connection.markTokenVerified(verifiedAt);
@@ -177,7 +173,6 @@ public class AuthService {
             userProfile.login(),
             userProfile.avatarUrl(),
             encryptedToken,
-            defaultTokenScopes(platform),
             baseUrl
         );
         connection.markTokenVerified(verifiedAt);
@@ -230,13 +225,6 @@ public class AuthService {
         } catch (URISyntaxException | IllegalArgumentException exception) {
             throw new IllegalArgumentException("GitLab baseUrl must be a valid HTTPS API base URL.", exception);
         }
-    }
-
-    private String defaultTokenScopes(PlatformType platform) {
-        return switch (platform) {
-            case GITHUB -> "fine-grained";
-            case GITLAB -> "api";
-        };
     }
 
     private String resolveDisplayName(RemoteUserProfile userProfile) {

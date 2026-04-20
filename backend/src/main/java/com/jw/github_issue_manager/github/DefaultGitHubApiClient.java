@@ -54,12 +54,10 @@ public class DefaultGitHubApiClient implements GitHubApiClient {
                 repository.owner().login(),
                 repository.name(),
                 repository.fullName(),
-                repository.description(),
-                repository.isPrivate(),
-                repository.htmlUrl(),
-                repository.defaultBranch(),
-                toLocalDateTime(repository.pushedAt())
-            ))
+            repository.description(),
+            repository.isPrivate(),
+            repository.htmlUrl()
+        ))
             .toList();
     }
 
@@ -202,8 +200,6 @@ public class DefaultGitHubApiClient implements GitHubApiClient {
         String description,
         @JsonProperty("private") boolean isPrivate,
         @JsonProperty("html_url") String htmlUrl,
-        @JsonProperty("default_branch") String defaultBranch,
-        @JsonProperty("pushed_at") String pushedAt,
         OwnerResponse owner
     ) {
     }
