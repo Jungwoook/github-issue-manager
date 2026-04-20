@@ -1,50 +1,34 @@
-# Platform Abstraction Interface Draft
+# Platform Abstraction Interface
 
 ## Summary
 
-- 목표: GitHub 전용 구조를 `공통 코어 + GitHub 어댑터` 구조로 분리한다.
-- 1차 범위: 백엔드에서 `PlatformGateway`, `PlatformType`, `Remote*` DTO 같은 공통 인터페이스를 먼저 도입한다.
-- 원칙: 기존 GitHub 기능은 유지하고, 서비스 레이어가 GitHub 구현체 대신 공통 포트에 의존하도록 바꾼다.
-- 데이터 모델: `githubRepositoryId`, `githubIssueId`, `GitHubAccount` 같은 GitHub 전용 식별자를 장기적으로 `platform + externalId` 구조로 일반화한다.
-- 프론트 방향: 프론트는 이번 단계에서 부분 수정하지 않고, 백엔드 공통 모듈 분리 리팩토링이 모두 완료된 이후 별도 작업으로 진행한다.
+- 목표: GitHub 전용 구조를 `공통 코어 + 플랫폼 어댑터` 구조로 분리한다.
+- 현재 상태: 백엔드 공통 포트, Remote DTO, GitHub/GitLab gateway, 플랫폼 공통 API 경로가 반영되어 있다.
+- 현재 한계: 새 플랫폼 추가 시 공통 enum, resolver, 프론트 플랫폼 목록에 수정이 발생하므로 완전한 모듈 구조는 아니다.
+- 다음 목표: 플랫폼 모듈 registry와 capability 선언 방식으로 전환해 새 플랫폼 추가 시 공통 코어 변경을 최소화한다.
+- 남은 범위: 모듈화 전환, 접근 제어, unique 제약, GitLab 표시/식별자 세부 모델, 미구현 확장 기능 정리.
 
 ## 1. 개요
 
-현재 프로젝트는 GitHub 중심 구조로 구현되어 있다.
+현재 프로젝트는 GitHub 중심 구현에서 플랫폼 어댑터 분리 구조로 전환되었다. 이 단계는 공통 포트 뒤에 GitHub/GitLab 구현을 숨긴 1차 추상화이며, 독립 모듈이나 플러그인 구조는 아직 아니다.
 
-- 인증 연결이 `GitHubAccount` 중심이다.
-- 원격 API 연동이 `GitHubApiClient` 중심이다.
-- 캐시 식별자가 `githubRepositoryId`, `githubIssueId`처럼 GitHub 전용 필드명에 묶여 있다.
-- 프론트 설정 화면도 `GitHubTokenPage`, `githubTokenApi`처럼 GitHub 전용 명칭을 사용한다.
+- 인증 연결은 `PlatformConnection` 중심이다.
+- 원격 API 연동은 `PlatformGateway` 중심이다.
+- 캐시 식별자는 `platform + externalId` 기준이다.
+- API 경로는 `/api/platforms/{platform}/...` 기준이다.
+- 프론트엔드는 플랫폼 라우트와 query key를 사용한다.
+- 플랫폼 목록과 등록 방식은 아직 공통 코드에 고정되어 있다.
 
-다른 플랫폼을 추가하려면 GitHub 구현을 제거하는 것이 아니라, GitHub를 첫 번째 플랫폼 어댑터로 재배치해야 한다.
+## 2. 완료된 목표
 
-## 2. 목표
+- GitHub 기능 유지
+- GitHub API client를 gateway 뒤로 이동
+- GitLab gateway 추가
+- 서비스 레이어의 GitHub 직접 의존 축소
+- DTO 필드명을 플랫폼 공통 이름으로 전환
+- 프론트 API 호출 경로와 라우트를 플랫폼 기준으로 전환
 
-- GitHub 기능은 그대로 유지한다.
-- 서비스 레이어가 GitHub 구체 타입 대신 공통 인터페이스에 의존하도록 바꾼다.
-- 향후 GitLab, Jira 같은 플랫폼을 추가할 수 있는 최소 공통 모델을 만든다.
-- 초기 단계에서는 API 스펙을 크게 깨지 않고 내부 구조부터 분리한다.
-
-## 3. 리팩토링 원칙
-
-### 3.1 공통 코어와 플랫폼 어댑터 분리
-
-- `core`: 플랫폼과 무관한 도메인 흐름
-- `platform`: 플랫폼별 구현
-- `github`: GitHub 전용 구현체
-
-### 3.2 서비스는 공통 포트만 사용
-
-- `IssueService`, `RepositoryService`, `AuthService`는 GitHub 타입을 직접 알지 않는다.
-- 어떤 플랫폼을 쓸지는 `PlatformGatewayResolver` 같은 선택 컴포넌트가 결정한다.
-
-### 3.3 식별자는 내부 ID와 외부 ID를 분리
-
-- 내부 DB 기본키와 외부 플랫폼 ID를 구분한다.
-- 외부 리소스 식별에는 `platform + externalId` 조합을 사용한다.
-
-## 4. 제안 패키지 구조
+## 3. 공통 패키지 구조
 
 ```text
 backend/src/main/java/com/jw/github_issue_manager
@@ -53,52 +37,37 @@ backend/src/main/java/com/jw/github_issue_manager
       PlatformType.java
       PlatformGateway.java
       PlatformGatewayResolver.java
-      PlatformConnectionService.java
+      DefaultPlatformGatewayResolver.java
     remote
       RemoteUserProfile.java
       RemoteRepository.java
       RemoteIssue.java
       RemoteComment.java
-    connection
-      PlatformConnection.java
-    resource
-      ExternalResourceRef.java
   github
-    GithubPlatformGateway.java
-    GithubRestClient.java
-    GithubProperties.java
-    GithubMapper.java
+    GitHubPlatformGateway.java
+    DefaultGitHubApiClient.java
+  gitlab
+    GitLabPlatformGateway.java
+    DefaultGitLabApiClient.java
+  domain
+    PlatformConnection.java
+    RepositoryCache.java
+    IssueCache.java
+    CommentCache.java
 ```
 
-초기 단계에서는 기존 `github` 패키지를 유지한 채, 그 앞에 `core.platform` 인터페이스를 두는 방식이 가장 안전하다.
+## 4. 공통 타입
 
-## 5. 공통 타입 초안
-
-### 5.1 플랫폼 종류
+### 4.1 플랫폼 종류
 
 ```java
 public enum PlatformType {
     GITHUB,
-    GITLAB,
-    JIRA
+    GITLAB
 }
 ```
 
-### 5.2 외부 리소스 참조
-
-```java
-public record ExternalResourceRef(
-    PlatformType platform,
-    String externalId,
-    String externalKey
-) {
-}
-```
-
-- `externalId`: 플랫폼 고유 ID
-- `externalKey`: 사용자가 식별하는 번호나 키
-
-### 5.3 원격 사용자 프로필
+### 4.2 원격 사용자
 
 ```java
 public record RemoteUserProfile(
@@ -112,7 +81,7 @@ public record RemoteUserProfile(
 }
 ```
 
-### 5.4 원격 저장소
+### 4.3 원격 저장소
 
 ```java
 public record RemoteRepository(
@@ -123,20 +92,17 @@ public record RemoteRepository(
     String fullName,
     String description,
     boolean isPrivate,
-    String webUrl,
-    String defaultBranch,
-    java.time.LocalDateTime pushedAt
+    String webUrl
 ) {
 }
 ```
 
-### 5.5 원격 이슈
+### 4.4 원격 이슈
 
 ```java
 public record RemoteIssue(
     PlatformType platform,
     String externalId,
-    String repositoryExternalId,
     String numberOrKey,
     String title,
     String body,
@@ -149,13 +115,12 @@ public record RemoteIssue(
 }
 ```
 
-### 5.6 원격 댓글
+### 4.5 원격 댓글
 
 ```java
 public record RemoteComment(
     PlatformType platform,
     String externalId,
-    String issueExternalId,
     String authorLogin,
     String body,
     java.time.LocalDateTime createdAt,
@@ -164,25 +129,27 @@ public record RemoteComment(
 }
 ```
 
-## 6. 플랫폼 게이트웨이 인터페이스 초안
+## 5. PlatformGateway
 
 ```java
 public interface PlatformGateway {
 
     PlatformType getPlatformType();
 
-    RemoteUserProfile getAuthenticatedUser(String accessToken);
+    RemoteUserProfile getAuthenticatedUser(String accessToken, String baseUrl);
 
-    java.util.List<RemoteRepository> getAccessibleRepositories(String accessToken);
+    java.util.List<RemoteRepository> getAccessibleRepositories(String accessToken, String baseUrl);
 
     java.util.List<RemoteIssue> getRepositoryIssues(
         String accessToken,
+        String baseUrl,
         String ownerKey,
         String repositoryName
     );
 
     RemoteIssue createIssue(
         String accessToken,
+        String baseUrl,
         String ownerKey,
         String repositoryName,
         String title,
@@ -191,6 +158,7 @@ public interface PlatformGateway {
 
     RemoteIssue updateIssue(
         String accessToken,
+        String baseUrl,
         String ownerKey,
         String repositoryName,
         String issueKey,
@@ -201,6 +169,7 @@ public interface PlatformGateway {
 
     java.util.List<RemoteComment> getIssueComments(
         String accessToken,
+        String baseUrl,
         String ownerKey,
         String repositoryName,
         String issueKey
@@ -208,6 +177,7 @@ public interface PlatformGateway {
 
     RemoteComment createComment(
         String accessToken,
+        String baseUrl,
         String ownerKey,
         String repositoryName,
         String issueKey,
@@ -216,384 +186,132 @@ public interface PlatformGateway {
 }
 ```
 
-초기 버전에서는 메서드 파라미터를 현재 GitHub 구조에 맞춰 `ownerKey`, `repositoryName`, `issueKey` 형태로 유지하는 것이 현실적이다.
+## 6. 현재 매핑
 
-## 7. 플랫폼 선택 인터페이스 초안
+### GitHub
+
+- `externalId`: GitHub numeric id
+- `ownerKey`: repository owner login
+- `name`: repository name
+- `numberOrKey`: issue number
+- `baseUrl`: 사용하지 않음
+
+### GitLab
+
+- `externalId`: GitLab project/issue/note id
+- `ownerKey`: 현재 연결 계정 login
+- `name`: `path_with_namespace`
+- `fullName`: `path_with_namespace`
+- `numberOrKey`: issue `iid`
+- `baseUrl`: 연결별 GitLab API base URL
+
+## 7. 서비스 적용 방식
+
+- `AuthService`: 플랫폼별 현재 사용자 검증과 연결 저장
+- `RepositoryService`: gateway로 저장소 목록 조회 후 캐시 갱신
+- `IssueService`: gateway로 이슈 조회/생성/수정 후 캐시 갱신
+- `CommentService`: gateway로 댓글 조회/작성 후 캐시 갱신
+
+## 8. 프론트 적용 상태
+
+- 연결 API: `entities/platform-connection/api/platformConnectionApi.ts`
+- 라우트: `/settings/platforms/:platform`, `/platforms/:platform/repositories/...`
+- query key: platform 인자를 포함
+- legacy GitHub 라우트는 기본 플랫폼으로 redirect
+- GitHub/GitLab 탭과 GitLab base URL 입력 흐름 반영
+
+## 9. 남은 후속 범위
+
+### 9.1 플랫폼 모듈화
+
+- 현재 `PlatformType` enum에 플랫폼이 고정되어 있다.
+- 현재 resolver는 등록된 gateway를 찾아주지만, 새 플랫폼 추가 시 공통 코드 수정이 필요하다.
+- 프론트도 `SUPPORTED_PLATFORMS`, `PLATFORM_METADATA`를 직접 수정해야 한다.
+- 다음 단계에서는 플랫폼 모듈이 스스로 id, 표시명, 연결 입력값, capability, gateway를 제공하도록 바꾼다.
+
+목표 계약 예시:
 
 ```java
-public interface PlatformGatewayResolver {
-
-    PlatformGateway getGateway(PlatformType platform);
+public interface PlatformModule {
+    String id();
+    String displayName();
+    java.util.Set<PlatformCapability> capabilities();
+    PlatformGateway gateway();
 }
 ```
 
-현재는 `GITHUB -> GithubPlatformGateway` 하나만 있어도 충분하다.
-
-## 8. 연결 관리 인터페이스 초안
+capability 예시:
 
 ```java
-public interface PlatformConnectionService {
-
-    PlatformConnection connect(PlatformType platform, String accessToken);
-
-    PlatformConnection requireConnection(PlatformType platform, jakarta.servlet.http.HttpSession session);
-
-    String requireAccessToken(PlatformType platform, jakarta.servlet.http.HttpSession session);
-
-    void disconnect(PlatformType platform, jakarta.servlet.http.HttpSession session);
+public enum PlatformCapability {
+    REPOSITORY_LIST,
+    ISSUE_LIST,
+    ISSUE_MUTATION,
+    COMMENT_LIST,
+    COMMENT_MUTATION,
+    LABEL_MANAGEMENT
 }
 ```
 
-### 공통 연결 엔티티 초안
+목표 구조:
 
-```java
-public class PlatformConnection {
-
-    private Long id;
-    private User user;
-    private PlatformType platform;
-    private String externalUserId;
-    private String accountLogin;
-    private String avatarUrl;
-    private String accessTokenEncrypted;
-    private String tokenScopes;
-    private java.time.LocalDateTime tokenVerifiedAt;
-    private java.time.LocalDateTime connectedAt;
-    private java.time.LocalDateTime lastAuthenticatedAt;
-}
+```text
+platform-core
+platform-github
+platform-gitlab
+platform-{new}
 ```
 
-## 9. 현재 클래스와 목표 인터페이스 매핑
+### 9.2 접근 제어
 
-### 9.1 인증
+- 현재 저장소 접근 검증은 `ownerKey == accountLogin` 기준이다.
+- GitHub organization, GitLab group/subgroup 저장소를 안정적으로 다루려면 접근 권한 캐시 또는 연결-저장소 관계가 필요하다.
 
-- 현재: `AuthService`, `GitHubAccount`, `GitHubAccountRepository`
-- 목표: `PlatformConnectionService`, `PlatformConnection`, `PlatformConnectionRepository`
+### 9.3 연결 unique 제약
 
-### 9.2 원격 API
+- 현재 `externalUserId`, `accountLogin` 단일 unique 제약은 self-managed GitLab에서 충돌 가능성이 있다.
+- 장기적으로 `platform + baseUrl + externalUserId` 기준이 필요하다.
 
-- 현재: `GitHubApiClient`, `DefaultGitHubApiClient`
-- 목표: `PlatformGateway`, `GithubPlatformGateway`
+### 9.4 GitLab 저장소 식별자
 
-### 9.3 저장소 캐시
+- 현재 GitLab은 `path_with_namespace`를 API 호출용 이름으로 사용한다.
+- 장기적으로 `displayName`, `pathWithNamespace`, `ownerKey`, `repositorySlug` 역할 분리가 필요하다.
 
-- 현재: `RepositoryCache.githubRepositoryId`
-- 목표: `RepositoryCache.platform`, `RepositoryCache.externalId`
+### 9.5 확장 기능
 
-### 9.4 이슈 캐시
+- 라벨, 담당자, 우선순위, milestone, sub-issue는 공통 포트 설계가 아직 없다.
+- 해당 기능은 별도 문서와 별도 API 계약으로 진행한다.
 
-- 현재: `IssueCache.githubIssueId`, `IssueCache.githubRepositoryId`
-- 목표: `IssueCache.platform`, `IssueCache.externalId`, `IssueCache.repositoryExternalId`
+## 10. 모듈화 진행 단계
 
-### 9.5 댓글 캐시
+### 10.1 1단계: 현재 구조 명확화
 
-- 현재: GitHub 댓글 중심 캐시 구조
-- 목표: `CommentCache.platform`, `CommentCache.externalId`, `CommentCache.issueExternalId`
+- 문서상 현재 구조를 "완전한 모듈 구조"가 아니라 "플랫폼 어댑터 분리 단계"로 정의한다.
+- 새 플랫폼 추가 시 공통 코드 수정이 발생하는 지점을 명시한다.
+- GitHub/GitLab 구현은 유지하고 동작 변경은 만들지 않는다.
 
-## 10. 엔티티 필드 전환 초안
+### 10.2 2단계: Platform registry 도입
 
-### 10.1 RepositoryCache
+- `PlatformType` enum 직접 의존을 축소한다.
+- 플랫폼 식별자는 문자열 기반 `platformId` 또는 값 객체로 다룬다.
+- Spring bean으로 등록된 `PlatformModule` 목록을 registry가 수집한다.
+- resolver는 enum switch가 아니라 registry 조회로 gateway를 찾는다.
 
-- 현재: `githubRepositoryId`, `ownerLogin`
-- 제안: `platform`, `externalId`, `ownerKey`
+### 10.3 3단계: capability 기반 서비스 계약 분리
 
-### 10.2 IssueCache
+- `PlatformGateway` 하나가 모든 기능을 담당하는 구조를 기능별 capability로 나눈다.
+- 예: repository, issue, comment, label capability
+- 지원하지 않는 기능은 공통 서비스에서 명확한 오류로 처리한다.
+- 새 플랫폼은 가능한 capability만 구현한다.
 
-- 현재: `githubIssueId`, `githubRepositoryId`, `number`
-- 제안: `platform`, `externalId`, `repositoryExternalId`, `numberOrKey`
+### 10.4 4단계: 플랫폼 metadata API 제공
 
-### 10.3 GitHubAccount
+- 백엔드는 등록된 플랫폼 목록, 표시명, 토큰 입력 안내, base URL 필요 여부, 지원 capability를 반환한다.
+- 프론트는 이 metadata로 플랫폼 탭과 연결 폼을 구성한다.
+- 새 플랫폼 추가 시 프론트 하드코딩 수정 범위를 줄인다.
 
-- 현재: `githubUserId`, `login`
-- 제안: `platform`, `externalUserId`, `accountLogin`
+### 10.5 5단계: 패키지 또는 빌드 모듈 분리
 
-## 11. 서비스 레이어 적용 방식
-
-### 11.1 RepositoryService 초안
-
-```java
-PlatformType platform = PlatformType.GITHUB;
-PlatformGateway gateway = platformGatewayResolver.getGateway(platform);
-String accessToken = platformConnectionService.requireAccessToken(platform, session);
-List<RemoteRepository> repositories = gateway.getAccessibleRepositories(accessToken);
-```
-
-### 11.2 IssueService 초안
-
-```java
-RepositoryCache repository = requireAccessibleRepository(repositoryId, session);
-PlatformGateway gateway = platformGatewayResolver.getGateway(repository.getPlatform());
-String accessToken = platformConnectionService.requireAccessToken(repository.getPlatform(), session);
-
-List<RemoteIssue> issues = gateway.getRepositoryIssues(
-    accessToken,
-    repository.getOwnerKey(),
-    repository.getName()
-);
-```
-
-핵심은 서비스가 더 이상 `GitHubApiClient`, `GitHubIssueInfo`, `GitHubRepositoryInfo`를 직접 모르도록 만드는 것이다.
-
-## 12. 프론트 리팩토링 방침
-
-현재 프론트는 다음처럼 GitHub 전용 구조를 가진다.
-
-- `entities/github/api/githubTokenApi.ts`
-- `pages/settings/GitHubTokenPage.tsx`
-- `widgets/github-token/*`
-- `queryKeys.githubTokenStatus`
-
-프론트는 이번 공통 모듈 분리 단계에서 함께 수정하지 않는다.
-
-- 백엔드 공통 인터페이스와 데이터 모델 분리가 먼저 끝나야 한다.
-- 중간 단계에서 프론트까지 같이 건드리면 API 명세와 화면 구조가 반복 변경될 가능성이 크다.
-- 따라서 프론트는 백엔드 구조가 안정화된 이후 별도 작업으로 진행한다.
-
-## 13. 1차 리팩토링 범위
-
-1차에서는 백엔드 서비스 레이어의 의존성 분리까지 진행한다.
-
-1. `PlatformType`, `Remote*` DTO, `PlatformGateway` 도입
-2. `GitHubApiClient` 구현을 `PlatformGateway` 구현체로 감싸기
-3. `AuthService`, `RepositoryService`, `IssueService`가 공통 포트를 사용하도록 변경
-
-이 단계에서는 DB 테이블명과 API 경로를 모두 바꾸지 않아도 된다.
-프론트는 이 단계에 포함하지 않는다.
-
-## 14. 2차 리팩토링 범위
-
-2차에서는 백엔드 데이터 모델까지 일반화한다.
-
-1. `GitHubAccount` -> `PlatformConnection`
-2. `githubRepositoryId` -> `externalId`
-3. `githubIssueId` -> `externalId`
-4. 캐시 엔티티에 `platform` 필드 추가
-5. 리포지토리 메서드를 `findByPlatformAndExternalId` 형태로 전환
-
-이 단계부터는 마이그레이션 스크립트와 API 응답 필드명 정리가 필요하다.
-프론트는 여전히 범위에 포함하지 않는다.
-
-## 15. 프론트 후속 리팩토링 단계
-
-프론트는 백엔드 구조 정리가 끝난 뒤 별도 작업으로 진행한다.
-
-1. 설정 화면을 공통 플랫폼 연결 구조로 전환
-2. GitHub 전용 API 모듈을 플랫폼 연결 모듈로 재구성
-3. 쿼리 키, 라우트, 화면 네이밍을 공통 구조로 일괄 정리
-
-즉, 프론트 리팩토링은 2차 백엔드 리팩토링 완료 후 후속 단계로 분리한다.
-
-### 15.1 백엔드 3차 리팩토링 이후 프론트에 필요한 변경
-
-현재 백엔드 변경은 기능 추가보다 API 경로, DTO 필드명, 플랫폼 선택 방식 변경의 성격이 강하다.
-따라서 프론트는 화면 기능을 새로 만드는 것보다 기존 GitHub 전용 구조를 플랫폼 공통 구조로 옮기는 작업이 우선이다.
-
-### 15.2 필수 변경 범위
-
-#### A. 인증 API 경로 변경 반영
-
-- 기존: `/api/github/token`, `/api/github/token/status`
-- 변경: `/api/platforms/{platform}/token`, `/api/platforms/{platform}/token/status`
-- 프론트 영향:
-  - `entities/github/api/githubTokenApi.ts`
-  - `widgets/github-token/*`
-  - GitHub 연결 상태를 조회하는 레이아웃/사이드바 위젯
-
-인증 화면은 내부적으로 `platform = 'github'`를 넘기는 공통 API 호출 형태로 바꿔야 한다.
-초기 화면은 GitHub만 보여줘도 되지만, API 함수 시그니처는 플랫폼을 받을 수 있게 만들어야 한다.
-
-#### B. 저장소/이슈/댓글 API 경로 변경 반영
-
-- 기존: `/api/repositories/...`
-- 변경: `/api/platforms/{platform}/repositories/...`
-- 프론트 영향:
-  - 저장소 목록 API
-  - 이슈 목록/상세/생성/수정 API
-  - 댓글 목록/생성 API
-  - 라우터 경로와 링크 생성 로직
-
-프론트는 더 이상 저장소와 이슈를 GitHub 전용 리소스로 취급하지 않고,
-모든 API 호출과 링크 생성 시 `platform` 파라미터를 함께 다루도록 바꿔야 한다.
-
-#### C. DTO 필드명 변경 반영
-
-백엔드 응답은 GitHub 전용 필드명에서 공통 필드명으로 바뀌었다.
-
-- `githubLogin` -> `accountLogin`
-- `githubRepositoryId` -> `repositoryId`
-- `ownerLogin` -> `ownerKey`
-- `htmlUrl` -> `webUrl`
-- `githubIssueId` -> `issueId`
-- `number` -> `numberOrKey`
-- `githubCommentId` -> `commentId`
-- `MeResponse`에 `platform` 필드 추가
-
-프론트 영향:
-
-- `entities/repository/model/types.ts`
-- `entities/issue/model/types.ts`
-- `entities/comment/model/types.ts`
-- `entities/github/model/types.ts`
-- 응답 변환 로직이 있는 API 계층 전체
-
-이 단계에서는 타입 정의와 매핑 함수를 먼저 바꾸고,
-컴포넌트는 새 타입명을 따라가도록 순차적으로 수정하는 방식이 안전하다.
-
-### 15.3 구조 리팩토링 권장 방향
-
-#### A. GitHub 전용 엔티티 모듈을 플랫폼 연결 모듈로 승격
-
-- 현재:
-  - `entities/github/api/githubTokenApi.ts`
-  - `entities/github/model/types.ts`
-- 권장:
-  - `entities/platform-connection/api/platformConnectionApi.ts`
-  - `entities/platform-connection/model/types.ts`
-
-초기 구현은 내부적으로 GitHub만 지원해도 되지만,
-파일명과 타입명은 GitHub가 아니라 플랫폼 연결 기준으로 바꾸는 것이 맞다.
-
-#### B. 설정 페이지와 위젯 이름 일반화
-
-- 현재:
-  - `GitHubTokenPage`
-  - `GitHubTokenForm`
-  - `GitHubConnectionStatus`
-- 권장:
-  - `PlatformConnectionPage`
-  - `PlatformConnectionForm`
-  - `PlatformConnectionStatus`
-
-초기 UI 문구는 GitHub를 유지할 수 있지만,
-컴포넌트 구조는 플랫폼 파라미터를 받을 수 있는 공통 컴포넌트로 전환하는 것이 좋다.
-
-#### C. 쿼리 키와 라우트 일반화
-
-- 현재:
-  - `queryKeys.githubTokenStatus`
-  - `/settings/github`
-  - `/repositories/:repositoryId/issues`
-- 권장:
-  - `queryKeys.platformTokenStatus(platform)`
-  - `/settings/platforms/:platform`
-  - `/platforms/:platform/repositories/:repositoryId/issues`
-
-프론트 라우트도 백엔드와 같은 축인 `platform` 기준으로 맞추는 것이 이후 확장에 유리하다.
-
-### 15.4 문구와 화면에서 정리할 항목
-
-현재 화면 텍스트에도 GitHub 전용 표현이 많이 남아 있다.
-
-- `GitHub PAT 설정`
-- `GitHub 저장소 목록`
-- `선택한 GitHub 이슈`
-- `GitHub에서 PAT를 발급`
-
-이 문구는 두 단계로 정리하는 것이 좋다.
-
-1. 구조 리팩토링 단계
-- 파일명, 타입명, API 경로, 라우트부터 공통 구조로 변경
-- 화면 문구는 필요한 최소 범위만 수정
-
-2. UI 정리 단계
-- GitHub 전용 문구를 `플랫폼 연결`, `저장소`, `이슈`, `댓글`처럼 일반화
-- GitHub가 필요한 안내 문구만 설정 화면 내부에 국한
-
-### 15.5 프론트 리팩토링 권장 순서
-
-1. 타입 정의와 API 경로를 새 백엔드 계약에 맞춘다.
-2. 쿼리 키와 데이터 패칭 훅을 플랫폼 기준으로 바꾼다.
-3. 라우트를 `/platforms/:platform/...` 구조로 옮긴다.
-4. 설정 화면과 상태 위젯을 `platform-connection` 구조로 통합한다.
-5. 저장소/이슈/댓글 화면의 링크와 필드 사용부를 새 타입 기준으로 정리한다.
-6. 마지막에 GitHub 전용 네이밍과 문구를 일괄 정리한다.
-
-### 15.6 프론트 1차 리팩토링 범위
-
-프론트 1차는 `백엔드 3차 계약에 맞춰 현재 GitHub 화면이 계속 동작하도록 만드는 단계`다.
-
-#### 포함 범위
-
-1. API 경로 변경 반영
-- `/api/github/token` -> `/api/platforms/github/token`
-- `/api/repositories/...` -> `/api/platforms/github/repositories/...`
-
-2. 응답 타입 필드명 변경 반영
-- `githubLogin` -> `accountLogin`
-- `githubRepositoryId` -> `repositoryId`
-- `ownerLogin` -> `ownerKey`
-- `htmlUrl` -> `webUrl`
-- `githubIssueId` -> `issueId`
-- `number` -> `numberOrKey`
-- `githubCommentId` -> `commentId`
-
-3. 프론트 데이터 계층 정리
-- 토큰 API, 저장소 API, 이슈 API, 댓글 API를 새 백엔드 계약에 맞춤
-- query key와 훅이 플랫폼 파라미터를 받을 수 있도록 최소 수정
-
-4. 기존 화면 동작 유지
-- 설정 화면
-- 연결 상태 위젯
-- 저장소 목록
-- 이슈 목록/상세/생성/수정
-- 댓글 조회/등록
-
-#### 1차 목표
-
-- 현재 GitHub 기능이 깨지지 않아야 한다.
-- 프론트가 새 백엔드 경로와 DTO에 맞춰 정상 동작해야 한다.
-- 내부 구현은 공통화 방향으로 옮기되, 화면 구조와 문구는 최소 수정에 그친다.
-
-### 15.7 프론트 2차 리팩토링 범위
-
-프론트 2차는 `GitHub 전용 프론트 구조를 플랫폼 공통 구조로 완전히 정리하는 단계`다.
-
-#### 포함 범위
-
-1. 모듈/파일 구조 일반화
-- `entities/github/*` -> `entities/platform-connection/*`
-- `widgets/github-token/*` -> `widgets/platform-connection/*`
-- `GitHubTokenPage` -> `PlatformConnectionPage`
-
-2. 라우트 구조 일반화
-- `/settings/github` -> `/settings/platforms/:platform`
-- `/repositories/:repositoryId/issues` -> `/platforms/:platform/repositories/:repositoryId/issues`
-
-3. 쿼리 키와 네이밍 일반화
-- `queryKeys.githubTokenStatus` -> `queryKeys.platformTokenStatus(platform)`
-- GitHub 전용 타입명, 함수명, 컴포넌트명 정리
-
-4. 화면 문구 일반화
-- `GitHub PAT 설정`
-- `GitHub 저장소 목록`
-- `선택한 GitHub 이슈`
-- `GitHub에서 PAT를 발급`
-
-위 문구를 `플랫폼 연결`, `저장소`, `이슈`, `댓글` 기준으로 정리하되,
-GitHub 고유 안내는 설정 화면 내부에만 남긴다.
-
-#### 2차 목표
-
-- 코드 구조와 라우트 구조가 모두 플랫폼 중심으로 정리되어야 한다.
-- 이후 GitLab, Jira 같은 플랫폼을 프론트에 추가할 때 동일 패턴으로 붙일 수 있어야 한다.
-
-### 15.8 이번 프론트 작업에서 하지 않아도 되는 것
-
-- GitLab/Jira UI를 바로 추가하는 작업
-- 다중 플랫폼 탭 UI를 한 번에 완성하는 작업
-- 디자인 시스템 전면 개편
-
-이번 단계의 목적은 `GitHub 전용 프론트 구조를 플랫폼 공통 구조로 옮기는 것`이며,
-다른 플랫폼 UI 추가는 그 다음 단계로 분리하는 것이 안전하다.
-
-## 16. 현재 코드 기준 추천 시작점
-
-현재 코드 기준으로 가장 좋은 시작점은 아래 순서다.
-
-1. `GitHubApiClient`를 대체하지 말고, 그 앞에 `PlatformGateway` 인터페이스를 추가한다.
-2. `GitHubIssueInfo`, `GitHubRepositoryInfo`, `GitHubCommentInfo`, `GitHubUserProfile`를 `Remote*` DTO로 변환하는 매퍼를 만든다.
-3. `RepositoryService`, `IssueService`, `AuthService`의 의존성을 GitHub 타입에서 공통 포트로 바꾼다.
-4. 구조가 안정화되면 백엔드 엔티티와 API 이름을 일반화한다.
-5. 백엔드 구조 정리가 끝난 뒤 프론트 공통화 작업을 별도 단계로 진행한다.
-
-이 순서로 가면 GitHub 기능을 유지하면서도 다중 플랫폼 확장을 위한 기반을 가장 낮은 리스크로 만들 수 있다.
+- 우선 패키지 경계를 `core`, `platform.github`, `platform.gitlab`처럼 정리한다.
+- 이후 필요 시 Gradle 멀티 모듈로 분리한다.
+- 최종 목표는 새 플랫폼 모듈 추가가 기존 플랫폼 구현과 공통 코어에 미치는 영향을 최소화하는 것이다.

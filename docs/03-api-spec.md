@@ -4,29 +4,36 @@
 
 - Base URL: `/api`
 - 요청/응답 형식: JSON
-- 인증 방식: 세션 + 사용자 등록 PAT
+- 인증 방식: 세션 + 플랫폼별 등록 PAT
+- 플랫폼 경로 값: `github`, `gitlab`
 
-## 2. 인증 및 연결
+## 2. 인증 및 플랫폼 연결
 
-### POST `/api/github/token`
+### POST `/api/platforms/{platform}/token`
 
-- PAT 등록 및 현재 사용자 연결
+- 플랫폼 PAT 등록 및 현재 세션 연결
+- GitLab은 `baseUrl`을 선택적으로 전달할 수 있다.
 
 요청 예시
 
 ```json
 {
-  "accessToken": "github_pat_xxx"
+  "accessToken": "github_pat_xxx",
+  "baseUrl": "https://gitlab.com/api/v4"
 }
 ```
 
-### GET `/api/github/token/status`
+### GET `/api/platforms/{platform}/token/status`
 
-- 현재 PAT 연결 상태 조회
+- 현재 세션 기준 플랫폼 PAT 연결 상태 조회
 
-### DELETE `/api/github/token`
+### DELETE `/api/platforms/{platform}/token`
 
-- PAT 연결 해제
+- 플랫폼 PAT 연결 해제
+
+### POST `/api/auth/logout`
+
+- 현재 세션 종료
 
 ### GET `/api/me`
 
@@ -34,42 +41,43 @@
 
 ## 3. 저장소
 
-### GET `/api/repositories`
+### GET `/api/platforms/{platform}/repositories`
 
-- 캐시된 저장소 목록 조회
+- 캐시된 저장소/프로젝트 목록 조회
 
 응답 예시
 
 ```json
 [
   {
-    "githubRepositoryId": 123,
-    "ownerLogin": "okjun",
+    "platform": "GITHUB",
+    "repositoryId": "123",
+    "ownerKey": "okjun",
     "name": "github-issue-manager",
     "fullName": "okjun/github-issue-manager",
-    "description": "GitHub issue manager",
-    "htmlUrl": "https://github.com/okjun/github-issue-manager",
-    "private": false,
-    "lastSyncedAt": "2026-04-02T12:00:00"
+    "description": "Issue manager",
+    "webUrl": "https://github.com/okjun/github-issue-manager",
+    "isPrivate": false,
+    "lastSyncedAt": "2026-04-20T12:00:00"
   }
 ]
 ```
 
-### POST `/api/repositories/refresh`
+### POST `/api/platforms/{platform}/repositories/refresh`
 
-- GitHub 저장소 목록 강제 동기화
+- 외부 플랫폼 저장소/프로젝트 목록 강제 동기화
 
-### GET `/api/repositories/{repositoryId}`
+### GET `/api/platforms/{platform}/repositories/{repositoryId}`
 
 - 저장소 상세 조회
 
-### GET `/api/repositories/{repositoryId}/sync-state`
+### GET `/api/platforms/{platform}/repositories/{repositoryId}/sync-state`
 
 - 저장소 마지막 동기화 상태 조회
 
 ## 4. 이슈
 
-### GET `/api/repositories/{repositoryId}/issues`
+### GET `/api/platforms/{platform}/repositories/{repositoryId}/issues`
 
 - 이슈 목록 조회
 
@@ -78,13 +86,13 @@
 - `keyword`
 - `state`
 
-### POST `/api/repositories/{repositoryId}/issues/refresh`
+### POST `/api/platforms/{platform}/repositories/{repositoryId}/issues/refresh`
 
 - 이슈 목록 강제 동기화
 
-### POST `/api/repositories/{repositoryId}/issues`
+### POST `/api/platforms/{platform}/repositories/{repositoryId}/issues`
 
-- GitHub 이슈 생성
+- 외부 플랫폼 이슈 생성
 
 요청 예시
 
@@ -95,11 +103,11 @@
 }
 ```
 
-### GET `/api/repositories/{repositoryId}/issues/{issueNumber}`
+### GET `/api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}`
 
 - 이슈 상세 조회
 
-### PATCH `/api/repositories/{repositoryId}/issues/{issueNumber}`
+### PATCH `/api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}`
 
 - 이슈 제목, 본문, 상태 수정
 
@@ -108,32 +116,32 @@
 ```json
 {
   "title": "Update issue refresh flow",
-  "body": "Sync GitHub issue cache manually.",
+  "body": "Sync issue cache manually.",
   "state": "CLOSED"
 }
 ```
 
-### DELETE `/api/repositories/{repositoryId}/issues/{issueNumber}`
+### DELETE `/api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}`
 
-- 현재 구현에서는 GitHub 이슈 삭제 대신 닫기 처리
+- 실제 삭제가 아니라 이슈 닫기 처리
 
-### GET `/api/repositories/{repositoryId}/issues/{issueNumber}/sync-state`
+### GET `/api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}/sync-state`
 
 - 이슈 마지막 동기화 상태 조회
 
 ## 5. 댓글
 
-### GET `/api/repositories/{repositoryId}/issues/{issueNumber}/comments`
+### GET `/api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}/comments`
 
 - 댓글 목록 조회
 
-### POST `/api/repositories/{repositoryId}/issues/{issueNumber}/comments/refresh`
+### POST `/api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}/comments/refresh`
 
 - 댓글 목록 강제 동기화
 
-### POST `/api/repositories/{repositoryId}/issues/{issueNumber}/comments`
+### POST `/api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}/comments`
 
-- GitHub 댓글 작성
+- 외부 플랫폼 댓글 작성
 
 요청 예시
 
@@ -143,11 +151,11 @@
 }
 ```
 
-## 6. 현재 미지원 API
+## 6. 현재 미구현 API
 
-아래 범위는 현재 구현되어 있지 않다.
-
-- 라벨 조회/생성/연결/해제
+- 라벨 조회/생성/연결/해제 백엔드 API
 - 담당자 변경
 - 우선순위 변경
+- milestone 관리
 - sub-issue 관리
+- GitLab merge request 연동

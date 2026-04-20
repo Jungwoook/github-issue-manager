@@ -2,10 +2,11 @@
 
 ## 1. 개요
 
-현재 데이터 모델은 PAT 기반 GitHub 연동 구조를 기준으로 한다.
+현재 데이터 모델은 플랫폼 공통 구조를 기준으로 한다.
 
-- GitHub 저장소, 이슈, 댓글은 원본 데이터다.
-- 내부 DB는 사용자 정보, PAT 연결 정보, 캐시, 동기화 상태를 저장한다.
+- `platform + externalId` 조합을 외부 리소스 식별 기준으로 사용한다.
+- GitHub와 GitLab 원본 데이터는 캐시에 저장한다.
+- PAT는 플랫폼 연결 엔티티에 암호화해 저장한다.
 
 ## 2. 핵심 테이블
 
@@ -21,51 +22,57 @@
 - `created_at`
 - `updated_at`
 
-### `github_accounts`
+### `platform_connections`
 
-- GitHub 계정과 PAT 연결 정보
+- 플랫폼 계정과 PAT 연결 정보
 
 주요 필드
 
 - `id`
 - `user_id`
-- `github_user_id`
-- `login`
+- `platform`
+- `external_user_id`
+- `account_login`
 - `avatar_url`
 - `access_token_encrypted`
-- `token_scopes`
+- `base_url`
 - `token_verified_at`
 - `connected_at`
 - `last_authenticated_at`
 
+현재 제약
+
+- `external_user_id`, `account_login`은 단일 unique 기준이다.
+- self-managed GitLab까지 고려하면 `platform + baseUrl + externalUserId` 형태의 복합 기준 보강이 필요하다.
+
 ### `repository_caches`
 
-- GitHub 저장소 캐시
+- 플랫폼 저장소/프로젝트 캐시
 
 주요 필드
 
 - `id`
-- `github_repository_id`
-- `owner_login`
+- `platform`
+- `external_id`
+- `owner_key`
 - `name`
 - `full_name`
 - `description`
 - `private`
-- `html_url`
-- `default_branch`
-- `last_pushed_at`
+- `web_url`
 - `last_synced_at`
 
 ### `issue_caches`
 
-- GitHub 이슈 캐시
+- 플랫폼 이슈 캐시
 
 주요 필드
 
 - `id`
-- `github_issue_id`
-- `github_repository_id`
-- `number`
+- `platform`
+- `external_id`
+- `repository_external_id`
+- `number_or_key`
 - `title`
 - `body`
 - `state`
@@ -77,13 +84,14 @@
 
 ### `comment_caches`
 
-- GitHub 댓글 캐시
+- 플랫폼 댓글 캐시
 
 주요 필드
 
 - `id`
-- `github_comment_id`
-- `github_issue_id`
+- `platform`
+- `external_id`
+- `issue_external_id`
 - `author_login`
 - `body`
 - `created_at`
@@ -105,22 +113,24 @@
 
 ## 3. 관계
 
-- `users` 1:1 `github_accounts`
+- `users` 1:N `platform_connections`
 - `repository_caches` 1:N `issue_caches`
 - `issue_caches` 1:N `comment_caches`
+- 캐시 관계는 내부 FK보다 `platform + externalId` 기준 조회를 우선한다.
 
 ## 4. 현재 제외된 모델
 
-현재 구현 범위에서는 아래 구조를 사용하지 않는다.
-
-- `github_installations`
-- 라벨 관련 테이블
-- 담당자 관련 테이블
-- 우선순위 관련 테이블
+- label 캐시/연결 테이블
+- assignee 관리 테이블
+- priority 관리 테이블
+- milestone 관리 테이블
 - sub-issue 부모/자식 관계
+- GitHub App installation 모델
+- GitLab merge request 모델
 
 ## 5. 설계 원칙
 
-- GitHub가 진실 원천이다.
-- 캐시는 조회 성능과 단순한 UI 흐름을 위한 보조 저장소다.
-- GitHub에 없는 기능은 추후 별도 테이블로 확장할 수 있다.
+- 외부 플랫폼이 원본 데이터이다.
+- 내부 DB는 조회 성능과 UI 흐름을 위한 보조 저장소이다.
+- 플랫폼별 차이는 gateway와 mapper에서 흡수한다.
+- 서비스와 API 응답은 공통 DTO 이름을 사용한다.
