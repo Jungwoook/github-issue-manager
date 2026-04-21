@@ -11,7 +11,6 @@ import com.jw.github_issue_manager.core.remote.RemoteIssue;
 import com.jw.github_issue_manager.connection.api.PlatformConnectionFacade;
 import com.jw.github_issue_manager.connection.api.TokenAccess;
 import com.jw.github_issue_manager.domain.IssueCache;
-import com.jw.github_issue_manager.domain.RepositoryCache;
 import com.jw.github_issue_manager.domain.SyncResourceType;
 import com.jw.github_issue_manager.dto.issue.CreateIssueRequest;
 import com.jw.github_issue_manager.dto.issue.IssueDetailResponse;
@@ -20,6 +19,8 @@ import com.jw.github_issue_manager.dto.issue.UpdateIssueRequest;
 import com.jw.github_issue_manager.dto.sync.SyncStateResponse;
 import com.jw.github_issue_manager.exception.ResourceNotFoundException;
 import com.jw.github_issue_manager.repository.IssueCacheRepository;
+import com.jw.github_issue_manager.repository.api.RepositoryAccess;
+import com.jw.github_issue_manager.repository.api.RepositoryFacade;
 
 import jakarta.servlet.http.HttpSession;
 
@@ -27,20 +28,20 @@ import jakarta.servlet.http.HttpSession;
 public class IssueService {
 
     private final IssueCacheRepository issueCacheRepository;
-    private final RepositoryService repositoryService;
+    private final RepositoryFacade repositoryFacade;
     private final SyncStateService syncStateService;
     private final PlatformConnectionFacade platformConnectionFacade;
     private final PlatformGatewayResolver platformGatewayResolver;
 
     public IssueService(
         IssueCacheRepository issueCacheRepository,
-        RepositoryService repositoryService,
+        RepositoryFacade repositoryFacade,
         SyncStateService syncStateService,
         PlatformConnectionFacade platformConnectionFacade,
         PlatformGatewayResolver platformGatewayResolver
     ) {
         this.issueCacheRepository = issueCacheRepository;
-        this.repositoryService = repositoryService;
+        this.repositoryFacade = repositoryFacade;
         this.syncStateService = syncStateService;
         this.platformConnectionFacade = platformConnectionFacade;
         this.platformGatewayResolver = platformGatewayResolver;
@@ -54,7 +55,7 @@ public class IssueService {
         String state,
         HttpSession session
     ) {
-        repositoryService.requireAccessibleRepository(platform, repositoryId, session);
+        repositoryFacade.requireAccessibleRepository(platform, repositoryId, session);
 
         return issueCacheRepository.findByPlatformAndRepositoryExternalIdOrderByNumberOrKeyDesc(platform, repositoryId).stream()
             .filter(issue -> keyword == null || keyword.isBlank() || containsIgnoreCase(issue.getTitle(), keyword) || containsIgnoreCase(issue.getBody(), keyword))
@@ -65,13 +66,13 @@ public class IssueService {
 
     @Transactional
     public List<IssueSummaryResponse> refreshIssues(PlatformType platform, String repositoryId, HttpSession session) {
-        RepositoryCache repository = repositoryService.requireAccessibleRepository(platform, repositoryId, session);
+        RepositoryAccess repository = repositoryFacade.requireAccessibleRepository(platform, repositoryId, session);
         TokenAccess tokenAccess = platformConnectionFacade.requireTokenAccess(platform, session);
         List<RemoteIssue> issues = platformGatewayResolver.getGateway(platform).getRepositoryIssues(
             tokenAccess.accessToken(),
             tokenAccess.baseUrl(),
-            repository.getOwnerKey(),
-            repository.getName()
+            repository.ownerKey(),
+            repository.name()
         );
         issues.forEach(issue -> upsertIssue(repository, issue));
 
@@ -86,13 +87,13 @@ public class IssueService {
 
     @Transactional
     public IssueDetailResponse createIssue(PlatformType platform, String repositoryId, CreateIssueRequest request, HttpSession session) {
-        RepositoryCache repository = repositoryService.requireAccessibleRepository(platform, repositoryId, session);
+        RepositoryAccess repository = repositoryFacade.requireAccessibleRepository(platform, repositoryId, session);
         TokenAccess tokenAccess = platformConnectionFacade.requireTokenAccess(platform, session);
         RemoteIssue createdIssue = platformGatewayResolver.getGateway(platform).createIssue(
             tokenAccess.accessToken(),
             tokenAccess.baseUrl(),
-            repository.getOwnerKey(),
-            repository.getName(),
+            repository.ownerKey(),
+            repository.name(),
             request.title(),
             request.body()
         );
@@ -120,15 +121,15 @@ public class IssueService {
         UpdateIssueRequest request,
         HttpSession session
     ) {
-        RepositoryCache repository = repositoryService.requireAccessibleRepository(platform, repositoryId, session);
+        RepositoryAccess repository = repositoryFacade.requireAccessibleRepository(platform, repositoryId, session);
         IssueCache currentIssue = requireIssue(platform, repositoryId, issueNumberOrKey, session);
         TokenAccess tokenAccess = platformConnectionFacade.requireTokenAccess(platform, session);
 
         RemoteIssue updatedIssue = platformGatewayResolver.getGateway(platform).updateIssue(
             tokenAccess.accessToken(),
             tokenAccess.baseUrl(),
-            repository.getOwnerKey(),
-            repository.getName(),
+            repository.ownerKey(),
+            repository.name(),
             issueNumberOrKey,
             request.title() != null ? request.title() : currentIssue.getTitle(),
             request.body() != null ? request.body() : currentIssue.getBody(),
@@ -147,13 +148,13 @@ public class IssueService {
 
     @Transactional
     public void deleteIssue(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
-        RepositoryCache repository = repositoryService.requireAccessibleRepository(platform, repositoryId, session);
+        RepositoryAccess repository = repositoryFacade.requireAccessibleRepository(platform, repositoryId, session);
         TokenAccess tokenAccess = platformConnectionFacade.requireTokenAccess(platform, session);
         platformGatewayResolver.getGateway(platform).updateIssue(
             tokenAccess.accessToken(),
             tokenAccess.baseUrl(),
-            repository.getOwnerKey(),
-            repository.getName(),
+            repository.ownerKey(),
+            repository.name(),
             issueNumberOrKey,
             null,
             null,
@@ -175,15 +176,15 @@ public class IssueService {
 
     @Transactional(readOnly = true)
     public IssueCache requireIssue(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
-        repositoryService.requireAccessibleRepository(platform, repositoryId, session);
+        repositoryFacade.requireAccessibleRepository(platform, repositoryId, session);
         return issueCacheRepository.findByPlatformAndRepositoryExternalIdAndNumberOrKey(platform, repositoryId, issueNumberOrKey)
             .orElseThrow(() -> new ResourceNotFoundException("ISSUE_NOT_FOUND", "Issue was not found."));
     }
 
-    private IssueCache upsertIssue(RepositoryCache repository, RemoteIssue issueInfo) {
+    private IssueCache upsertIssue(RepositoryAccess repository, RemoteIssue issueInfo) {
         return issueCacheRepository.findByPlatformAndRepositoryExternalIdAndNumberOrKey(
-                repository.getPlatform(),
-                repository.getExternalId(),
+                repository.platform(),
+                repository.externalId(),
                 issueInfo.numberOrKey()
             )
             .map(existing -> {
@@ -191,9 +192,9 @@ public class IssueService {
                 return existing;
             })
             .orElseGet(() -> issueCacheRepository.save(new IssueCache(
-                repository.getPlatform(),
+                repository.platform(),
                 issueInfo.externalId(),
-                repository.getExternalId(),
+                repository.externalId(),
                 issueInfo.numberOrKey(),
                 issueInfo.title(),
                 issueInfo.body(),

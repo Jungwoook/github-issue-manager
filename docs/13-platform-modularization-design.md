@@ -657,3 +657,15 @@ connection -> platform.api, shared
 - 유지: 외부 REST API 계약과 세션 기반 인증 흐름은 기존 동작 유지
 - 이유: 2차에서는 연결 모듈의 물리 소유권과 공개 호출 경계를 먼저 고정해 repository / issue / comment 모듈 이동 전에 token/baseUrl 접근 책임을 connection으로 모음
 - 다음: repository 모듈을 같은 방식으로 `repository.api` 경계 뒤로 이동
+
+## 15. 3차 적용 상태
+
+- 적용: `repository` 모듈에 저장소 캐시 책임 물리 이동
+- 적용: `RepositoryCache`, `RepositoryCacheRepository`, `RepositoryService`, repository DTO를 `repository` 모듈로 이동
+- 적용: `repository.api.RepositoryFacade`를 도입해 `app` controller와 issue/comment 서비스가 공개 API를 호출
+- 적용: `RepositoryAccess` result DTO를 도입해 issue/comment 서비스의 repository entity 직접 접근 제거
+- 적용: sync 상태 도메인, repository, service, DTO를 `shared-kernel`로 이동
+- 이유: repository 모듈이 refresh 결과를 기록하려면 sync 상태 기능이 필요하므로, `repository -> app` 역의존 대신 shared-kernel 공통 기능으로 분리
+- 유지: issue / comment 업무 코드는 아직 `app` 모듈 내부에 위치
+- 유지: 외부 REST API 계약과 저장소 refresh / 조회 흐름 유지
+- 다음: issue 모듈을 `issue.api` 경계 뒤로 이동
