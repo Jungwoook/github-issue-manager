@@ -8,6 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.jw.github_issue_manager.core.platform.PlatformGatewayResolver;
 import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.core.remote.RemoteComment;
+import com.jw.github_issue_manager.connection.api.PlatformConnectionFacade;
+import com.jw.github_issue_manager.connection.api.TokenAccess;
 import com.jw.github_issue_manager.domain.CommentCache;
 import com.jw.github_issue_manager.domain.IssueCache;
 import com.jw.github_issue_manager.domain.SyncResourceType;
@@ -24,7 +26,7 @@ public class CommentService {
     private final IssueService issueService;
     private final RepositoryService repositoryService;
     private final SyncStateService syncStateService;
-    private final AuthService authService;
+    private final PlatformConnectionFacade platformConnectionFacade;
     private final PlatformGatewayResolver platformGatewayResolver;
 
     public CommentService(
@@ -32,14 +34,14 @@ public class CommentService {
         IssueService issueService,
         RepositoryService repositoryService,
         SyncStateService syncStateService,
-        AuthService authService,
+        PlatformConnectionFacade platformConnectionFacade,
         PlatformGatewayResolver platformGatewayResolver
     ) {
         this.commentCacheRepository = commentCacheRepository;
         this.issueService = issueService;
         this.repositoryService = repositoryService;
         this.syncStateService = syncStateService;
-        this.authService = authService;
+        this.platformConnectionFacade = platformConnectionFacade;
         this.platformGatewayResolver = platformGatewayResolver;
     }
 
@@ -55,11 +57,10 @@ public class CommentService {
     public List<CommentResponse> refreshComments(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
         var repository = repositoryService.requireAccessibleRepository(platform, repositoryId, session);
         IssueCache issue = issueService.requireIssue(platform, repositoryId, issueNumberOrKey, session);
-        String accessToken = authService.requirePlatformAccessToken(platform, session);
-        String baseUrl = authService.requireCurrentConnection(platform, session).getBaseUrl();
+        TokenAccess tokenAccess = platformConnectionFacade.requireTokenAccess(platform, session);
         List<RemoteComment> comments = platformGatewayResolver.getGateway(platform).getIssueComments(
-            accessToken,
-            baseUrl,
+            tokenAccess.accessToken(),
+            tokenAccess.baseUrl(),
             repository.getOwnerKey(),
             repository.getName(),
             issueNumberOrKey
@@ -85,11 +86,10 @@ public class CommentService {
     ) {
         var repository = repositoryService.requireAccessibleRepository(platform, repositoryId, session);
         IssueCache issue = issueService.requireIssue(platform, repositoryId, issueNumberOrKey, session);
-        String accessToken = authService.requirePlatformAccessToken(platform, session);
-        String baseUrl = authService.requireCurrentConnection(platform, session).getBaseUrl();
+        TokenAccess tokenAccess = platformConnectionFacade.requireTokenAccess(platform, session);
         RemoteComment createdComment = platformGatewayResolver.getGateway(platform).createComment(
-            accessToken,
-            baseUrl,
+            tokenAccess.accessToken(),
+            tokenAccess.baseUrl(),
             repository.getOwnerKey(),
             repository.getName(),
             issueNumberOrKey,

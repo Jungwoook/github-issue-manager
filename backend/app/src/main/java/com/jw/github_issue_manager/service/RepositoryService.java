@@ -9,6 +9,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.jw.github_issue_manager.core.platform.PlatformGatewayResolver;
 import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.core.remote.RemoteRepository;
+import com.jw.github_issue_manager.connection.api.CurrentConnection;
+import com.jw.github_issue_manager.connection.api.PlatformConnectionFacade;
+import com.jw.github_issue_manager.connection.api.TokenAccess;
 import com.jw.github_issue_manager.domain.RepositoryCache;
 import com.jw.github_issue_manager.domain.SyncResourceType;
 import com.jw.github_issue_manager.dto.repository.RepositoryResponse;
@@ -22,25 +25,25 @@ import jakarta.servlet.http.HttpSession;
 public class RepositoryService {
 
     private final RepositoryCacheRepository repositoryCacheRepository;
-    private final AuthService authService;
+    private final PlatformConnectionFacade platformConnectionFacade;
     private final SyncStateService syncStateService;
     private final PlatformGatewayResolver platformGatewayResolver;
 
     public RepositoryService(
         RepositoryCacheRepository repositoryCacheRepository,
-        AuthService authService,
+        PlatformConnectionFacade platformConnectionFacade,
         SyncStateService syncStateService,
         PlatformGatewayResolver platformGatewayResolver
     ) {
         this.repositoryCacheRepository = repositoryCacheRepository;
-        this.authService = authService;
+        this.platformConnectionFacade = platformConnectionFacade;
         this.syncStateService = syncStateService;
         this.platformGatewayResolver = platformGatewayResolver;
     }
 
     @Transactional(readOnly = true)
     public List<RepositoryResponse> getRepositories(PlatformType platform, HttpSession session) {
-        String login = authService.requireCurrentConnection(platform, session).getAccountLogin();
+        String login = platformConnectionFacade.requireCurrentConnection(platform, session).accountLogin();
         return repositoryCacheRepository.findByPlatformAndOwnerKeyOrderByFullNameAsc(platform, login).stream()
             .map(this::toResponse)
             .toList();
@@ -48,15 +51,14 @@ public class RepositoryService {
 
     @Transactional
     public List<RepositoryResponse> refreshRepositories(PlatformType platform, HttpSession session) {
-        var connection = authService.requireCurrentConnection(platform, session);
-        String accessToken = authService.requirePlatformAccessToken(platform, session);
+        TokenAccess tokenAccess = platformConnectionFacade.requireTokenAccess(platform, session);
         List<RemoteRepository> repositories = platformGatewayResolver.getGateway(platform)
-            .getAccessibleRepositories(accessToken, connection.getBaseUrl());
+            .getAccessibleRepositories(tokenAccess.accessToken(), tokenAccess.baseUrl());
         repositories.forEach(this::upsertRepository);
 
         syncStateService.recordSuccess(
             SyncResourceType.REPOSITORY_LIST,
-            platform.name() + ":" + connection.getAccountLogin(),
+            platform.name() + ":" + tokenAccess.accountLogin(),
             "Repository cache refreshed."
         );
 
@@ -76,11 +78,11 @@ public class RepositoryService {
 
     @Transactional(readOnly = true)
     public RepositoryCache requireAccessibleRepository(PlatformType platform, String repositoryId, HttpSession session) {
-        String login = authService.requireCurrentConnection(platform, session).getAccountLogin();
+        CurrentConnection connection = platformConnectionFacade.requireCurrentConnection(platform, session);
         RepositoryCache repository = repositoryCacheRepository.findByPlatformAndExternalId(platform, repositoryId)
             .orElseThrow(() -> new ResourceNotFoundException("REPOSITORY_NOT_FOUND", "Repository was not found."));
 
-        if (!repository.getOwnerKey().equals(login)) {
+        if (!repository.getOwnerKey().equals(connection.accountLogin())) {
             throw new ResourceNotFoundException("REPOSITORY_NOT_FOUND", "Repository was not found.");
         }
 

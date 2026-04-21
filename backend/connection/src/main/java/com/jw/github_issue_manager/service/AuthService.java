@@ -10,6 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.jw.github_issue_manager.core.platform.PlatformGatewayResolver;
 import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.core.remote.RemoteUserProfile;
+import com.jw.github_issue_manager.connection.api.CurrentConnection;
+import com.jw.github_issue_manager.connection.api.TokenAccess;
 import com.jw.github_issue_manager.domain.PlatformConnection;
 import com.jw.github_issue_manager.domain.User;
 import com.jw.github_issue_manager.dto.auth.MeResponse;
@@ -115,8 +117,7 @@ public class AuthService {
         session.invalidate();
     }
 
-    @Transactional(readOnly = true)
-    public PlatformConnection requireCurrentConnection(PlatformType platform, HttpSession session) {
+    private PlatformConnection requireCurrentConnection(PlatformType platform, HttpSession session) {
         Object currentUserId = session.getAttribute(CURRENT_USER_ID);
         if (!(currentUserId instanceof Long userId)) {
             throw new UnauthorizedException(platform.name() + " login is required.");
@@ -126,12 +127,23 @@ public class AuthService {
             .orElseThrow(() -> new UnauthorizedException("Connected " + platform.name() + " account was not found."));
     }
 
-    public String requirePlatformAccessToken(PlatformType platform, HttpSession session) {
+    @Transactional(readOnly = true)
+    public CurrentConnection requireCurrentConnectionInfo(PlatformType platform, HttpSession session) {
+        return toCurrentConnection(requireCurrentConnection(platform, session));
+    }
+
+    @Transactional(readOnly = true)
+    public TokenAccess requireTokenAccess(PlatformType platform, HttpSession session) {
         PlatformConnection connection = requireCurrentConnection(platform, session);
         if (connection.getAccessTokenEncrypted() == null || connection.getAccessTokenEncrypted().isBlank()) {
             throw new UnauthorizedException(platform.name() + " personal access token is not connected.");
         }
-        return patCryptoService.decrypt(connection.getAccessTokenEncrypted());
+        return new TokenAccess(
+            connection.getPlatform(),
+            patCryptoService.decrypt(connection.getAccessTokenEncrypted()),
+            connection.getBaseUrl(),
+            connection.getAccountLogin()
+        );
     }
 
     public PlatformType requireCurrentPlatform(HttpSession session) {
@@ -252,6 +264,18 @@ public class AuthService {
             connection.getPlatform(),
             connection.getAccountLogin(),
             connection.getAvatarUrl()
+        );
+    }
+
+    private CurrentConnection toCurrentConnection(PlatformConnection connection) {
+        return new CurrentConnection(
+            connection.getPlatform(),
+            connection.getUser().getId(),
+            connection.getExternalUserId(),
+            connection.getAccountLogin(),
+            connection.getAvatarUrl(),
+            connection.getTokenScopes(),
+            connection.getBaseUrl()
         );
     }
 }
