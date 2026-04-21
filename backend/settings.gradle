@@ -1,1 +1,9 @@
 rootProject.name = 'github-issue-manager'
+
+include 'app'
+include 'shared-kernel'
+include 'platform'
+include 'connection'
+include 'repository'
+include 'issue'
+include 'comment'

@@ -631,3 +631,14 @@ connection -> platform.api, shared
 - issue/comment가 repository 접근 확인을 매번 동기 호출할지, read model을 일부 복제할지 결정 필요
 - ArchUnit만 사용할지 Spring Modulith까지 도입할지 결정 필요
 - Gradle 멀티 모듈 승격 시점을 어느 작업 단위 이후로 둘지 결정 필요
+
+## 13. 1차 적용 상태
+
+- 적용: Gradle 멀티 모듈 골격 생성
+- 적용: `app`, `platform`, `shared-kernel`, `connection`, `repository`, `issue`, `comment` 모듈 등록
+- 적용: 기존 Spring Boot 실행 코드와 업무 서비스는 `app` 모듈로 이동
+- 적용: `core`, `github`, `gitlab` 패키지는 `platform` 모듈로 물리 분리
+- 적용: GitLab platform 테스트는 `platform` 모듈 테스트로 이동
+- 유지: connection / repository / issue / comment 업무 코드는 아직 `app` 모듈 내부에 위치
+- 이유: public API facade와 entity 경계가 아직 충분히 분리되지 않아 업무 모듈을 바로 물리 분리하면 순환 의존과 JPA scan 리스크가 큼
+- 다음: connection public API와 token access 경계를 만든 뒤 connection 모듈로 이동
