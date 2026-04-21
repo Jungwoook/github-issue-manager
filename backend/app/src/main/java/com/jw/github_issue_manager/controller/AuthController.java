@@ -10,10 +10,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.jw.github_issue_manager.core.platform.PlatformType;
+import com.jw.github_issue_manager.connection.api.PlatformConnectionFacade;
 import com.jw.github_issue_manager.dto.auth.MeResponse;
 import com.jw.github_issue_manager.dto.auth.PlatformTokenStatusResponse;
 import com.jw.github_issue_manager.dto.auth.RegisterPlatformTokenRequest;
-import com.jw.github_issue_manager.service.AuthService;
 
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -22,10 +22,10 @@ import jakarta.validation.Valid;
 @RequestMapping("/api")
 public class AuthController {
 
-    private final AuthService authService;
+    private final PlatformConnectionFacade platformConnectionFacade;
 
-    public AuthController(AuthService authService) {
-        this.authService = authService;
+    public AuthController(PlatformConnectionFacade platformConnectionFacade) {
+        this.platformConnectionFacade = platformConnectionFacade;
     }
 
     @PostMapping("/platforms/{platform}/token")
@@ -34,28 +34,28 @@ public class AuthController {
         @Valid @RequestBody RegisterPlatformTokenRequest request,
         HttpSession session
     ) {
-        return ResponseEntity.ok(authService.registerPlatformToken(PlatformType.from(platform), request, session));
+        return ResponseEntity.ok(platformConnectionFacade.registerPlatformToken(PlatformType.from(platform), request, session));
     }
 
     @GetMapping("/platforms/{platform}/token/status")
     public ResponseEntity<PlatformTokenStatusResponse> tokenStatus(@PathVariable String platform, HttpSession session) {
-        return ResponseEntity.ok(authService.getPlatformTokenStatus(PlatformType.from(platform), session));
+        return ResponseEntity.ok(platformConnectionFacade.getPlatformTokenStatus(PlatformType.from(platform), session));
     }
 
     @DeleteMapping("/platforms/{platform}/token")
     public ResponseEntity<Void> disconnectToken(@PathVariable String platform, HttpSession session) {
-        authService.disconnectPlatformToken(PlatformType.from(platform), session);
+        platformConnectionFacade.disconnectPlatformToken(PlatformType.from(platform), session);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/auth/logout")
     public ResponseEntity<Void> logout(HttpSession session) {
-        authService.logout(session);
+        platformConnectionFacade.logout(session);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/me")
     public ResponseEntity<MeResponse> me(HttpSession session) {
-        return ResponseEntity.ok(authService.getCurrentUser(session));
+        return ResponseEntity.ok(platformConnectionFacade.getCurrentUser(session));
     }
 }
