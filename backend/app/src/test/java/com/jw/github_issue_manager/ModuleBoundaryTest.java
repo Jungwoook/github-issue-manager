@@ -24,6 +24,12 @@ class ModuleBoundaryTest {
         "com.jw.github_issue_manager.issue.api.",
         "com.jw.github_issue_manager.repository.api."
     );
+    private static final Map<String, String> MODULE_API_PREFIXES = Map.of(
+        "comment", "com.jw.github_issue_manager.comment.api.",
+        "connection", "com.jw.github_issue_manager.connection.api.",
+        "issue", "com.jw.github_issue_manager.issue.api.",
+        "repository", "com.jw.github_issue_manager.repository.api."
+    );
 
     @Test
     void gradleModuleDependenciesFollowDocumentedDirection() throws IOException {
@@ -53,7 +59,8 @@ class ModuleBoundaryTest {
             List<String> violations = sourceFiles
                 .filter(path -> path.toString().endsWith(".java"))
                 .flatMap(this::importsFrom)
-                .filter(importLine -> importLine.startsWith("import com.jw.github_issue_manager.domain.")
+                .filter(importLine -> importLine.contains(".internal.")
+                    || importLine.startsWith("import com.jw.github_issue_manager.domain.")
                     || importLine.startsWith("import com.jw.github_issue_manager.repository.")
                     || importLine.startsWith("import com.jw.github_issue_manager.service."))
                 .filter(importLine -> APP_ALLOWED_API_IMPORTS.stream().noneMatch(importLine::contains))
@@ -64,6 +71,18 @@ class ModuleBoundaryTest {
                 "app module must depend on module api packages only: " + violations
             );
         }
+    }
+
+    @Test
+    void publicApiPackagesOnlyUseTheirOwnInternalImplementation() throws IOException {
+        List<String> violations = MODULE_API_PREFIXES.entrySet().stream()
+            .flatMap(entry -> internalImportsFromPublicApi(entry.getKey(), entry.getValue()))
+            .toList();
+
+        assertTrue(
+            violations.isEmpty(),
+            "public api packages must not depend on other module internals: " + violations
+        );
     }
 
     private Set<String> projectDependencies(String moduleName) throws IOException {
@@ -81,6 +100,35 @@ class ModuleBoundaryTest {
             return Files.readAllLines(sourceFile).stream()
                 .map(String::trim)
                 .filter(line -> line.startsWith("import "));
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to read " + sourceFile, exception);
+        }
+    }
+
+    private Stream<String> internalImportsFromPublicApi(String moduleName, String apiPackagePrefix) {
+        Path moduleSourceRoot = backendRoot().resolve(moduleName).resolve("src/main/java");
+        String ownInternalPrefix = "import " + apiPackagePrefix.replace(".api.", ".internal.");
+        try {
+            return Files.walk(moduleSourceRoot)
+                .filter(path -> path.toString().endsWith(".java"))
+                .filter(path -> packageName(path).startsWith(apiPackagePrefix))
+                .flatMap(this::importsFrom)
+                .filter(importLine -> importLine.contains(".internal."))
+                .filter(importLine -> !importLine.startsWith(ownInternalPrefix))
+                .map(importLine -> moduleName + ": " + importLine);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to inspect api package for " + moduleName, exception);
+        }
+    }
+
+    private String packageName(Path sourceFile) {
+        try {
+            return Files.readAllLines(sourceFile).stream()
+                .map(String::trim)
+                .filter(line -> line.startsWith("package "))
+                .findFirst()
+                .map(line -> line.substring("package ".length(), line.length() - 1))
+                .orElse("");
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to read " + sourceFile, exception);
         }

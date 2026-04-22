@@ -699,3 +699,13 @@ connection -> platform.api, shared
 - 이유: 물리 모듈 이동 이후 의존 방향과 Spring/JPA 스캔 누락을 회귀 테스트로 막아 다음 구조 변경의 안전망 확보
 - 유지: 외부 REST API 계약과 전체 API flow 테스트 유지
 - 다음: 필요 시 public API 패키지와 internal 패키지 네이밍을 더 명확히 분리
+
+## 19. 7차 적용 상태
+
+- 적용: connection / repository / issue / comment 내부 구현 패키지를 `*.internal.*`로 이동
+- 적용: 각 모듈의 public facade는 자기 모듈 내부 구현만 참조하도록 유지
+- 적용: app 테스트의 JPA entity scan 검증 대상을 새 internal entity 패키지로 갱신
+- 적용: 모듈 경계 테스트에 public API 패키지의 타 모듈 internal import 차단 규칙 추가
+- 이유: 물리 모듈 분리 이후에도 공통 `domain`, `repository`, `service` 패키지명이 남아 있으면 모듈 소유권이 흐려지므로, 공개 API와 내부 구현의 네이밍 경계를 명확히 분리
+- 유지: DTO 패키지와 외부 REST API 계약은 그대로 유지
+- 다음: 필요 시 DTO도 모듈별 `api.dto` 패키지로 점진 이동

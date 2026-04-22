@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.dto.comment.CommentResponse;
 import com.jw.github_issue_manager.dto.comment.CreateCommentRequest;
-import com.jw.github_issue_manager.service.CommentService;
+import com.jw.github_issue_manager.comment.internal.service.CommentService;
 
 import jakarta.servlet.http.HttpSession;
 
