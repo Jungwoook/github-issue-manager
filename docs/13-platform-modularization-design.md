@@ -669,3 +669,14 @@ connection -> platform.api, shared
 - 유지: issue / comment 업무 코드는 아직 `app` 모듈 내부에 위치
 - 유지: 외부 REST API 계약과 저장소 refresh / 조회 흐름 유지
 - 다음: issue 모듈을 `issue.api` 경계 뒤로 이동
+
+## 16. 4차 적용 상태
+
+- 적용: `issue` 모듈에 이슈 캐시 책임 물리 이동
+- 적용: `IssueCache`, `IssueCacheRepository`, `IssueService`, issue DTO를 `issue` 모듈로 이동
+- 적용: `issue.api.IssueFacade`를 도입해 `app` controller와 comment 서비스가 공개 API를 호출
+- 적용: `IssueAccess` result DTO를 도입해 comment 서비스의 issue entity 직접 접근 제거
+- 이유: comment 모듈 분리 전에 issue 접근 확인과 issue external id 조회를 공개 API로 고정해 다음 단계 순환 의존 리스크를 줄임
+- 유지: comment 업무 코드는 아직 `app` 모듈 내부에 위치
+- 유지: 외부 REST API 계약과 이슈 조회/refresh/생성/수정/닫기 흐름 유지
+- 다음: comment 모듈을 `comment.api` 경계 뒤로 이동

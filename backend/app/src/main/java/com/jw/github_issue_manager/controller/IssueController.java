@@ -19,7 +19,7 @@ import com.jw.github_issue_manager.dto.issue.IssueDetailResponse;
 import com.jw.github_issue_manager.dto.issue.IssueSummaryResponse;
 import com.jw.github_issue_manager.dto.issue.UpdateIssueRequest;
 import com.jw.github_issue_manager.dto.sync.SyncStateResponse;
-import com.jw.github_issue_manager.service.IssueService;
+import com.jw.github_issue_manager.issue.api.IssueFacade;
 
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -28,10 +28,10 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/platforms/{platform}/repositories/{repositoryId}/issues")
 public class IssueController {
 
-    private final IssueService issueService;
+    private final IssueFacade issueFacade;
 
-    public IssueController(IssueService issueService) {
-        this.issueService = issueService;
+    public IssueController(IssueFacade issueFacade) {
+        this.issueFacade = issueFacade;
     }
 
     @GetMapping
@@ -42,7 +42,7 @@ public class IssueController {
         @RequestParam(required = false) String state,
         HttpSession session
     ) {
-        return ResponseEntity.ok(issueService.getIssues(PlatformType.from(platform), repositoryId, keyword, state, session));
+        return ResponseEntity.ok(issueFacade.getIssues(PlatformType.from(platform), repositoryId, keyword, state, session));
     }
 
     @PostMapping("/refresh")
@@ -51,7 +51,7 @@ public class IssueController {
         @PathVariable String repositoryId,
         HttpSession session
     ) {
-        return ResponseEntity.ok(issueService.refreshIssues(PlatformType.from(platform), repositoryId, session));
+        return ResponseEntity.ok(issueFacade.refreshIssues(PlatformType.from(platform), repositoryId, session));
     }
 
     @PostMapping
@@ -61,7 +61,7 @@ public class IssueController {
         @Valid @RequestBody CreateIssueRequest request,
         HttpSession session
     ) {
-        return ResponseEntity.ok(issueService.createIssue(PlatformType.from(platform), repositoryId, request, session));
+        return ResponseEntity.ok(issueFacade.createIssue(PlatformType.from(platform), repositoryId, request, session));
     }
 
     @GetMapping("/{issueNumberOrKey}")
@@ -71,7 +71,7 @@ public class IssueController {
         @PathVariable String issueNumberOrKey,
         HttpSession session
     ) {
-        return ResponseEntity.ok(issueService.getIssue(PlatformType.from(platform), repositoryId, issueNumberOrKey, session));
+        return ResponseEntity.ok(issueFacade.getIssue(PlatformType.from(platform), repositoryId, issueNumberOrKey, session));
     }
 
     @PatchMapping("/{issueNumberOrKey}")
@@ -82,7 +82,7 @@ public class IssueController {
         @RequestBody UpdateIssueRequest request,
         HttpSession session
     ) {
-        return ResponseEntity.ok(issueService.updateIssue(PlatformType.from(platform), repositoryId, issueNumberOrKey, request, session));
+        return ResponseEntity.ok(issueFacade.updateIssue(PlatformType.from(platform), repositoryId, issueNumberOrKey, request, session));
     }
 
     @DeleteMapping("/{issueNumberOrKey}")
@@ -92,7 +92,7 @@ public class IssueController {
         @PathVariable String issueNumberOrKey,
         HttpSession session
     ) {
-        issueService.deleteIssue(PlatformType.from(platform), repositoryId, issueNumberOrKey, session);
+        issueFacade.deleteIssue(PlatformType.from(platform), repositoryId, issueNumberOrKey, session);
         return ResponseEntity.noContent().build();
     }
 
@@ -103,6 +103,6 @@ public class IssueController {
         @PathVariable String issueNumberOrKey,
         HttpSession session
     ) {
-        return ResponseEntity.ok(issueService.getIssueSyncState(PlatformType.from(platform), repositoryId, issueNumberOrKey, session));
+        return ResponseEntity.ok(issueFacade.getIssueSyncState(PlatformType.from(platform), repositoryId, issueNumberOrKey, session));
     }
 }

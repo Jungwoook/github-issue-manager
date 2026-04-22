@@ -6,6 +6,7 @@ dependencies {
 	implementation project(':platform')
 	implementation project(':connection')
 	implementation project(':repository')
+	implementation project(':issue')
 	implementation project(':shared-kernel')
 
 	implementation 'org.springframework.boot:spring-boot-h2console'
