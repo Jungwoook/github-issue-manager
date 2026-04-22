@@ -689,3 +689,13 @@ connection -> platform.api, shared
 - 이유: 마지막 업무 캐시 모듈을 물리 분리해 `app`이 controller/bootstrapping 중심 역할만 갖도록 축소
 - 유지: 외부 REST API 계약과 댓글 조회/refresh/작성 흐름 유지
 - 다음: 모듈 의존성 규칙 테스트와 Spring/JPA scan 경계 점검
+
+## 18. 6차 적용 상태
+
+- 적용: Gradle 모듈 의존 방향을 테스트로 고정
+- 적용: `app` 모듈이 업무 모듈의 `api` 패키지만 직접 참조하는지 테스트로 검증
+- 적용: Spring context에서 connection / repository / issue / comment facade bean 등록을 검증
+- 적용: JPA metamodel에서 connection / repository / issue / comment / sync entity 스캔을 검증
+- 이유: 물리 모듈 이동 이후 의존 방향과 Spring/JPA 스캔 누락을 회귀 테스트로 막아 다음 구조 변경의 안전망 확보
+- 유지: 외부 REST API 계약과 전체 API flow 테스트 유지
+- 다음: 필요 시 public API 패키지와 internal 패키지 네이밍을 더 명확히 분리
