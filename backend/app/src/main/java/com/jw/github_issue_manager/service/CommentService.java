@@ -11,10 +11,11 @@ import com.jw.github_issue_manager.core.remote.RemoteComment;
 import com.jw.github_issue_manager.connection.api.PlatformConnectionFacade;
 import com.jw.github_issue_manager.connection.api.TokenAccess;
 import com.jw.github_issue_manager.domain.CommentCache;
-import com.jw.github_issue_manager.domain.IssueCache;
 import com.jw.github_issue_manager.domain.SyncResourceType;
 import com.jw.github_issue_manager.dto.comment.CommentResponse;
 import com.jw.github_issue_manager.dto.comment.CreateCommentRequest;
+import com.jw.github_issue_manager.issue.api.IssueAccess;
+import com.jw.github_issue_manager.issue.api.IssueFacade;
 import com.jw.github_issue_manager.repository.CommentCacheRepository;
 import com.jw.github_issue_manager.repository.api.RepositoryFacade;
 
@@ -24,7 +25,7 @@ import jakarta.servlet.http.HttpSession;
 public class CommentService {
 
     private final CommentCacheRepository commentCacheRepository;
-    private final IssueService issueService;
+    private final IssueFacade issueFacade;
     private final RepositoryFacade repositoryFacade;
     private final SyncStateService syncStateService;
     private final PlatformConnectionFacade platformConnectionFacade;
@@ -32,14 +33,14 @@ public class CommentService {
 
     public CommentService(
         CommentCacheRepository commentCacheRepository,
-        IssueService issueService,
+        IssueFacade issueFacade,
         RepositoryFacade repositoryFacade,
         SyncStateService syncStateService,
         PlatformConnectionFacade platformConnectionFacade,
         PlatformGatewayResolver platformGatewayResolver
     ) {
         this.commentCacheRepository = commentCacheRepository;
-        this.issueService = issueService;
+        this.issueFacade = issueFacade;
         this.repositoryFacade = repositoryFacade;
         this.syncStateService = syncStateService;
         this.platformConnectionFacade = platformConnectionFacade;
@@ -48,8 +49,8 @@ public class CommentService {
 
     @Transactional(readOnly = true)
     public List<CommentResponse> getComments(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
-        IssueCache issue = issueService.requireIssue(platform, repositoryId, issueNumberOrKey, session);
-        return commentCacheRepository.findByPlatformAndIssueExternalIdOrderByCreatedAtAsc(platform, issue.getExternalId()).stream()
+        IssueAccess issue = issueFacade.requireIssue(platform, repositoryId, issueNumberOrKey, session);
+        return commentCacheRepository.findByPlatformAndIssueExternalIdOrderByCreatedAtAsc(platform, issue.externalId()).stream()
             .map(this::toResponse)
             .toList();
     }
@@ -57,7 +58,7 @@ public class CommentService {
     @Transactional
     public List<CommentResponse> refreshComments(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
         var repository = repositoryFacade.requireAccessibleRepository(platform, repositoryId, session);
-        IssueCache issue = issueService.requireIssue(platform, repositoryId, issueNumberOrKey, session);
+        IssueAccess issue = issueFacade.requireIssue(platform, repositoryId, issueNumberOrKey, session);
         TokenAccess tokenAccess = platformConnectionFacade.requireTokenAccess(platform, session);
         List<RemoteComment> comments = platformGatewayResolver.getGateway(platform).getIssueComments(
             tokenAccess.accessToken(),
@@ -70,7 +71,7 @@ public class CommentService {
 
         syncStateService.recordSuccess(
             SyncResourceType.COMMENT_LIST,
-            platform.name() + ":" + issue.getExternalId(),
+            platform.name() + ":" + issue.externalId(),
             "Comment cache refreshed."
         );
 
@@ -86,7 +87,7 @@ public class CommentService {
         HttpSession session
     ) {
         var repository = repositoryFacade.requireAccessibleRepository(platform, repositoryId, session);
-        IssueCache issue = issueService.requireIssue(platform, repositoryId, issueNumberOrKey, session);
+        IssueAccess issue = issueFacade.requireIssue(platform, repositoryId, issueNumberOrKey, session);
         TokenAccess tokenAccess = platformConnectionFacade.requireTokenAccess(platform, session);
         RemoteComment createdComment = platformGatewayResolver.getGateway(platform).createComment(
             tokenAccess.accessToken(),
@@ -100,19 +101,19 @@ public class CommentService {
 
         syncStateService.recordSuccess(
             SyncResourceType.COMMENT_LIST,
-            platform.name() + ":" + issue.getExternalId(),
+            platform.name() + ":" + issue.externalId(),
             "Comment created in cache."
         );
 
         return toResponse(comment);
     }
 
-    private CommentCache upsertComment(IssueCache issue, RemoteComment commentInfo) {
-        return commentCacheRepository.findByPlatformAndExternalId(issue.getPlatform(), commentInfo.externalId())
+    private CommentCache upsertComment(IssueAccess issue, RemoteComment commentInfo) {
+        return commentCacheRepository.findByPlatformAndExternalId(issue.platform(), commentInfo.externalId())
             .orElseGet(() -> commentCacheRepository.save(new CommentCache(
-                issue.getPlatform(),
+                issue.platform(),
                 commentInfo.externalId(),
-                issue.getExternalId(),
+                issue.externalId(),
                 commentInfo.authorLogin(),
                 commentInfo.body(),
                 commentInfo.createdAt(),

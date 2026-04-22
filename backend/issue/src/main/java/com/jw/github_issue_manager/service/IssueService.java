@@ -18,6 +18,7 @@ import com.jw.github_issue_manager.dto.issue.IssueSummaryResponse;
 import com.jw.github_issue_manager.dto.issue.UpdateIssueRequest;
 import com.jw.github_issue_manager.dto.sync.SyncStateResponse;
 import com.jw.github_issue_manager.exception.ResourceNotFoundException;
+import com.jw.github_issue_manager.issue.api.IssueAccess;
 import com.jw.github_issue_manager.repository.IssueCacheRepository;
 import com.jw.github_issue_manager.repository.api.RepositoryAccess;
 import com.jw.github_issue_manager.repository.api.RepositoryFacade;
@@ -110,7 +111,7 @@ public class IssueService {
 
     @Transactional(readOnly = true)
     public IssueDetailResponse getIssue(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
-        return toDetailResponse(requireIssue(platform, repositoryId, issueNumberOrKey, session));
+        return toDetailResponse(requireIssueCache(platform, repositoryId, issueNumberOrKey, session));
     }
 
     @Transactional
@@ -122,7 +123,7 @@ public class IssueService {
         HttpSession session
     ) {
         RepositoryAccess repository = repositoryFacade.requireAccessibleRepository(platform, repositoryId, session);
-        IssueCache currentIssue = requireIssue(platform, repositoryId, issueNumberOrKey, session);
+        IssueCache currentIssue = requireIssueCache(platform, repositoryId, issueNumberOrKey, session);
         TokenAccess tokenAccess = platformConnectionFacade.requireTokenAccess(platform, session);
 
         RemoteIssue updatedIssue = platformGatewayResolver.getGateway(platform).updateIssue(
@@ -175,7 +176,11 @@ public class IssueService {
     }
 
     @Transactional(readOnly = true)
-    public IssueCache requireIssue(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
+    public IssueAccess requireIssue(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
+        return toAccess(requireIssueCache(platform, repositoryId, issueNumberOrKey, session));
+    }
+
+    private IssueCache requireIssueCache(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
         repositoryFacade.requireAccessibleRepository(platform, repositoryId, session);
         return issueCacheRepository.findByPlatformAndRepositoryExternalIdAndNumberOrKey(platform, repositoryId, issueNumberOrKey)
             .orElseThrow(() -> new ResourceNotFoundException("ISSUE_NOT_FOUND", "Issue was not found."));
@@ -254,6 +259,15 @@ public class IssueService {
             issue.getUpdatedAt(),
             issue.getClosedAt(),
             issue.getLastSyncedAt()
+        );
+    }
+
+    private IssueAccess toAccess(IssueCache issue) {
+        return new IssueAccess(
+            issue.getPlatform(),
+            issue.getExternalId(),
+            issue.getRepositoryExternalId(),
+            issue.getNumberOrKey()
         );
     }
 }
