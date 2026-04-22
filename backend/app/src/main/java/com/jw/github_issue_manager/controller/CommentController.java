@@ -10,10 +10,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.jw.github_issue_manager.comment.api.CommentFacade;
 import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.dto.comment.CommentResponse;
 import com.jw.github_issue_manager.dto.comment.CreateCommentRequest;
-import com.jw.github_issue_manager.service.CommentService;
 
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -22,10 +22,10 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}/comments")
 public class CommentController {
 
-    private final CommentService commentService;
+    private final CommentFacade commentFacade;
 
-    public CommentController(CommentService commentService) {
-        this.commentService = commentService;
+    public CommentController(CommentFacade commentFacade) {
+        this.commentFacade = commentFacade;
     }
 
     @GetMapping
@@ -35,7 +35,7 @@ public class CommentController {
         @PathVariable String issueNumberOrKey,
         HttpSession session
     ) {
-        return ResponseEntity.ok(commentService.getComments(PlatformType.from(platform), repositoryId, issueNumberOrKey, session));
+        return ResponseEntity.ok(commentFacade.getComments(PlatformType.from(platform), repositoryId, issueNumberOrKey, session));
     }
 
     @PostMapping("/refresh")
@@ -45,7 +45,7 @@ public class CommentController {
         @PathVariable String issueNumberOrKey,
         HttpSession session
     ) {
-        return ResponseEntity.ok(commentService.refreshComments(PlatformType.from(platform), repositoryId, issueNumberOrKey, session));
+        return ResponseEntity.ok(commentFacade.refreshComments(PlatformType.from(platform), repositoryId, issueNumberOrKey, session));
     }
 
     @PostMapping
@@ -56,6 +56,6 @@ public class CommentController {
         @Valid @RequestBody CreateCommentRequest request,
         HttpSession session
     ) {
-        return ResponseEntity.ok(commentService.createComment(PlatformType.from(platform), repositoryId, issueNumberOrKey, request, session));
+        return ResponseEntity.ok(commentFacade.createComment(PlatformType.from(platform), repositoryId, issueNumberOrKey, request, session));
     }
 }

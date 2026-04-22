@@ -680,3 +680,12 @@ connection -> platform.api, shared
 - 유지: comment 업무 코드는 아직 `app` 모듈 내부에 위치
 - 유지: 외부 REST API 계약과 이슈 조회/refresh/생성/수정/닫기 흐름 유지
 - 다음: comment 모듈을 `comment.api` 경계 뒤로 이동
+
+## 17. 5차 적용 상태
+
+- 적용: `comment` 모듈에 댓글 캐시 책임 물리 이동
+- 적용: `CommentCache`, `CommentCacheRepository`, `CommentService`, comment DTO를 `comment` 모듈로 이동
+- 적용: `comment.api.CommentFacade`를 도입해 `app` controller가 공개 API를 호출
+- 이유: 마지막 업무 캐시 모듈을 물리 분리해 `app`이 controller/bootstrapping 중심 역할만 갖도록 축소
+- 유지: 외부 REST API 계약과 댓글 조회/refresh/작성 흐름 유지
+- 다음: 모듈 의존성 규칙 테스트와 Spring/JPA scan 경계 점검
