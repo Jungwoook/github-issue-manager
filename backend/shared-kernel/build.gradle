@@ -1,3 +1,9 @@
 plugins {
 	id 'java-library'
 }
+
+dependencies {
+	api project(':platform')
+
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+}

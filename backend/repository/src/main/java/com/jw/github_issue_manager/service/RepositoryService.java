@@ -17,6 +17,7 @@ import com.jw.github_issue_manager.domain.SyncResourceType;
 import com.jw.github_issue_manager.dto.repository.RepositoryResponse;
 import com.jw.github_issue_manager.dto.sync.SyncStateResponse;
 import com.jw.github_issue_manager.exception.ResourceNotFoundException;
+import com.jw.github_issue_manager.repository.api.RepositoryAccess;
 import com.jw.github_issue_manager.repository.RepositoryCacheRepository;
 
 import jakarta.servlet.http.HttpSession;
@@ -67,7 +68,7 @@ public class RepositoryService {
 
     @Transactional(readOnly = true)
     public RepositoryResponse getRepository(PlatformType platform, String repositoryId, HttpSession session) {
-        return toResponse(requireAccessibleRepository(platform, repositoryId, session));
+        return toResponse(requireAccessibleRepositoryCache(platform, repositoryId, session));
     }
 
     @Transactional(readOnly = true)
@@ -77,7 +78,11 @@ public class RepositoryService {
     }
 
     @Transactional(readOnly = true)
-    public RepositoryCache requireAccessibleRepository(PlatformType platform, String repositoryId, HttpSession session) {
+    public RepositoryAccess requireAccessibleRepository(PlatformType platform, String repositoryId, HttpSession session) {
+        return toAccess(requireAccessibleRepositoryCache(platform, repositoryId, session));
+    }
+
+    private RepositoryCache requireAccessibleRepositoryCache(PlatformType platform, String repositoryId, HttpSession session) {
         CurrentConnection connection = platformConnectionFacade.requireCurrentConnection(platform, session);
         RepositoryCache repository = repositoryCacheRepository.findByPlatformAndExternalId(platform, repositoryId)
             .orElseThrow(() -> new ResourceNotFoundException("REPOSITORY_NOT_FOUND", "Repository was not found."));
@@ -134,6 +139,15 @@ public class RepositoryService {
             repository.getWebUrl(),
             repository.isPrivate(),
             repository.getLastSyncedAt()
+        );
+    }
+
+    private RepositoryAccess toAccess(RepositoryCache repository) {
+        return new RepositoryAccess(
+            repository.getPlatform(),
+            repository.getExternalId(),
+            repository.getOwnerKey(),
+            repository.getName()
         );
     }
 }
