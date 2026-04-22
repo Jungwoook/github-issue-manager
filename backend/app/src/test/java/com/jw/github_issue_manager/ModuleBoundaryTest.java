@@ -85,6 +85,27 @@ class ModuleBoundaryTest {
         );
     }
 
+    @Test
+    void moduleDtosStayUnderApiPackages() throws IOException {
+        Path backendRoot = backendRoot();
+        try (Stream<Path> sourceFiles = Files.walk(backendRoot)) {
+            List<String> violations = sourceFiles
+                .filter(path -> path.toString().endsWith(".java"))
+                .flatMap(this::importsAndPackagesFrom)
+                .filter(line -> line.contains("com.jw.github_issue_manager.dto.auth")
+                    || line.contains("com.jw.github_issue_manager.dto.comment")
+                    || line.contains("com.jw.github_issue_manager.dto.issue")
+                    || line.contains("com.jw.github_issue_manager.dto.repository")
+                    || line.contains("com.jw.github_issue_manager.dto.sync"))
+                .toList();
+
+            assertTrue(
+                violations.isEmpty(),
+                "module DTOs must live under module api dto packages: " + violations
+            );
+        }
+    }
+
     private Set<String> projectDependencies(String moduleName) throws IOException {
         String buildGradle = Files.readString(backendRoot().resolve(moduleName).resolve("build.gradle"));
         Matcher matcher = PROJECT_DEPENDENCY.matcher(buildGradle);
@@ -100,6 +121,16 @@ class ModuleBoundaryTest {
             return Files.readAllLines(sourceFile).stream()
                 .map(String::trim)
                 .filter(line -> line.startsWith("import "));
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to read " + sourceFile, exception);
+        }
+    }
+
+    private Stream<String> importsAndPackagesFrom(Path sourceFile) {
+        try {
+            return Files.readAllLines(sourceFile).stream()
+                .map(String::trim)
+                .filter(line -> line.startsWith("import ") || line.startsWith("package "));
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to read " + sourceFile, exception);
         }

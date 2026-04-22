@@ -11,9 +11,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.connection.api.PlatformConnectionFacade;
-import com.jw.github_issue_manager.dto.auth.MeResponse;
-import com.jw.github_issue_manager.dto.auth.PlatformTokenStatusResponse;
-import com.jw.github_issue_manager.dto.auth.RegisterPlatformTokenRequest;
+import com.jw.github_issue_manager.connection.api.dto.MeResponse;
+import com.jw.github_issue_manager.connection.api.dto.PlatformTokenStatusResponse;
+import com.jw.github_issue_manager.connection.api.dto.RegisterPlatformTokenRequest;
 
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;

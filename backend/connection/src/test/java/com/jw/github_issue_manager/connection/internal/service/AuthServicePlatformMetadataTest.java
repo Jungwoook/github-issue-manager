@@ -21,7 +21,7 @@ import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.core.remote.RemoteUserProfile;
 import com.jw.github_issue_manager.connection.internal.domain.PlatformConnection;
 import com.jw.github_issue_manager.connection.internal.domain.User;
-import com.jw.github_issue_manager.dto.auth.RegisterPlatformTokenRequest;
+import com.jw.github_issue_manager.connection.api.dto.RegisterPlatformTokenRequest;
 import com.jw.github_issue_manager.connection.internal.repository.PlatformConnectionRepository;
 import com.jw.github_issue_manager.connection.internal.repository.UserRepository;
 

@@ -14,11 +14,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.jw.github_issue_manager.core.platform.PlatformType;
-import com.jw.github_issue_manager.dto.issue.CreateIssueRequest;
-import com.jw.github_issue_manager.dto.issue.IssueDetailResponse;
-import com.jw.github_issue_manager.dto.issue.IssueSummaryResponse;
-import com.jw.github_issue_manager.dto.issue.UpdateIssueRequest;
-import com.jw.github_issue_manager.dto.sync.SyncStateResponse;
+import com.jw.github_issue_manager.issue.api.dto.CreateIssueRequest;
+import com.jw.github_issue_manager.issue.api.dto.IssueDetailResponse;
+import com.jw.github_issue_manager.issue.api.dto.IssueSummaryResponse;
+import com.jw.github_issue_manager.issue.api.dto.UpdateIssueRequest;
+import com.jw.github_issue_manager.shared.api.dto.SyncStateResponse;
 import com.jw.github_issue_manager.issue.api.IssueFacade;
 
 import jakarta.servlet.http.HttpSession;

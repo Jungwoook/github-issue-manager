@@ -709,3 +709,13 @@ connection -> platform.api, shared
 - 이유: 물리 모듈 분리 이후에도 공통 `domain`, `repository`, `service` 패키지명이 남아 있으면 모듈 소유권이 흐려지므로, 공개 API와 내부 구현의 네이밍 경계를 명확히 분리
 - 유지: DTO 패키지와 외부 REST API 계약은 그대로 유지
 - 다음: 필요 시 DTO도 모듈별 `api.dto` 패키지로 점진 이동
+
+## 20. 8차 적용 상태
+
+- 적용: auth / repository / issue / comment / sync DTO를 각 모듈의 `api.dto` 패키지로 이동
+- 적용: connection / repository / issue / comment facade와 controller import를 새 DTO 패키지로 갱신
+- 적용: 공통 `dto.auth`, `dto.repository`, `dto.issue`, `dto.comment`, `dto.sync` 패키지 재사용을 차단하는 테스트 추가
+- 이유: 외부 REST 계약에 쓰이는 request/response도 모듈 공개 API의 일부이므로 facade와 같은 public API 경계 안으로 이동
+- 유지: app 전용 health DTO와 exception response는 app 소유로 유지
+- 유지: JSON 필드와 외부 REST API 계약은 변경 없음
+- 다음: 불필요한 transitive `api` 의존을 `implementation`으로 줄이는 의존성 정리

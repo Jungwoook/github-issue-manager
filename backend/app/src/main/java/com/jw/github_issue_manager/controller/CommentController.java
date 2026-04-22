@@ -12,8 +12,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.jw.github_issue_manager.comment.api.CommentFacade;
 import com.jw.github_issue_manager.core.platform.PlatformType;
-import com.jw.github_issue_manager.dto.comment.CommentResponse;
-import com.jw.github_issue_manager.dto.comment.CreateCommentRequest;
+import com.jw.github_issue_manager.comment.api.dto.CommentResponse;
+import com.jw.github_issue_manager.comment.api.dto.CreateCommentRequest;
 
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;

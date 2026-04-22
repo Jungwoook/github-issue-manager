@@ -3,10 +3,10 @@ package com.jw.github_issue_manager.connection.api;
 import org.springframework.stereotype.Service;
 
 import com.jw.github_issue_manager.core.platform.PlatformType;
-import com.jw.github_issue_manager.dto.auth.MeResponse;
-import com.jw.github_issue_manager.dto.auth.PlatformConnectionResponse;
-import com.jw.github_issue_manager.dto.auth.PlatformTokenStatusResponse;
-import com.jw.github_issue_manager.dto.auth.RegisterPlatformTokenRequest;
+import com.jw.github_issue_manager.connection.api.dto.MeResponse;
+import com.jw.github_issue_manager.connection.api.dto.PlatformConnectionResponse;
+import com.jw.github_issue_manager.connection.api.dto.PlatformTokenStatusResponse;
+import com.jw.github_issue_manager.connection.api.dto.RegisterPlatformTokenRequest;
 import com.jw.github_issue_manager.connection.internal.service.AuthService;
 
 import jakarta.servlet.http.HttpSession;

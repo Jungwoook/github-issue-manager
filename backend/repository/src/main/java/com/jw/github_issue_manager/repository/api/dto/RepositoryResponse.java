@@ -1,4 +1,4 @@
-package com.jw.github_issue_manager.dto.repository;
+package com.jw.github_issue_manager.repository.api.dto;
 
 import java.time.LocalDateTime;
 

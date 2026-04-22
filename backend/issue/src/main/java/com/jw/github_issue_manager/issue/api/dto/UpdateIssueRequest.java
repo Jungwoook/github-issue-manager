@@ -1,4 +1,4 @@
-package com.jw.github_issue_manager.dto.issue;
+package com.jw.github_issue_manager.issue.api.dto;
 
 public record UpdateIssueRequest(
     String title,
