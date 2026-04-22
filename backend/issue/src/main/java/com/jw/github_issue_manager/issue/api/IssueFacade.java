@@ -10,7 +10,7 @@ import com.jw.github_issue_manager.dto.issue.IssueDetailResponse;
 import com.jw.github_issue_manager.dto.issue.IssueSummaryResponse;
 import com.jw.github_issue_manager.dto.issue.UpdateIssueRequest;
 import com.jw.github_issue_manager.dto.sync.SyncStateResponse;
-import com.jw.github_issue_manager.service.IssueService;
+import com.jw.github_issue_manager.issue.internal.service.IssueService;
 
 import jakarta.servlet.http.HttpSession;
 

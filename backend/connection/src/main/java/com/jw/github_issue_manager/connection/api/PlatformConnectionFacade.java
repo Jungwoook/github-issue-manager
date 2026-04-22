@@ -7,7 +7,7 @@ import com.jw.github_issue_manager.dto.auth.MeResponse;
 import com.jw.github_issue_manager.dto.auth.PlatformConnectionResponse;
 import com.jw.github_issue_manager.dto.auth.PlatformTokenStatusResponse;
 import com.jw.github_issue_manager.dto.auth.RegisterPlatformTokenRequest;
-import com.jw.github_issue_manager.service.AuthService;
+import com.jw.github_issue_manager.connection.internal.service.AuthService;
 
 import jakarta.servlet.http.HttpSession;
 
