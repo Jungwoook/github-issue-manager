@@ -41,16 +41,17 @@ jobs:
         run: ./gradlew test
 
       - name: Build boot jar
-        run: ./gradlew clean bootJar
+        run: ./gradlew clean :app:bootJar
 
       - name: Rename jar to app.jar
         shell: bash
         run: |
-          JAR_PATH="$(find build/libs -maxdepth 1 -type f -name '*.jar' | head -n 1)"
+          JAR_PATH="$(find app/build/libs -maxdepth 1 -type f -name '*.jar' | head -n 1)"
           if [ -z "$JAR_PATH" ]; then
-            echo "No jar file found in backend/build/libs"
+            echo "No jar file found in backend/app/build/libs"
             exit 1
           fi
+          mkdir -p build/libs
           cp "$JAR_PATH" "build/libs/${JAR_NAME}"
 
       - name: Copy jar to EC2

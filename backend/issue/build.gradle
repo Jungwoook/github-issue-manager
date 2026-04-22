@@ -1,0 +1,10 @@
+plugins {
+	id 'java-library'
+}
+
+dependencies {
+	api project(':repository')
+	api project(':connection')
+	api project(':platform')
+	api project(':shared-kernel')
+}

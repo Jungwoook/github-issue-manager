@@ -30,7 +30,7 @@
 ## 현재 로컬 실행
 
 ```powershell
-./gradlew bootRun
+./gradlew :app:bootRun
 ```
 
 ## 현재 테스트 실행

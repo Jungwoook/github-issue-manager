@@ -631,3 +631,29 @@ connection -> platform.api, shared
 - issue/comment가 repository 접근 확인을 매번 동기 호출할지, read model을 일부 복제할지 결정 필요
 - ArchUnit만 사용할지 Spring Modulith까지 도입할지 결정 필요
 - Gradle 멀티 모듈 승격 시점을 어느 작업 단위 이후로 둘지 결정 필요
+
+## 13. 1차 적용 상태
+
+- 적용: Gradle 멀티 모듈 골격 생성
+- 적용: `app`, `platform`, `shared-kernel`, `connection`, `repository`, `issue`, `comment` 모듈 등록
+- 적용: 기존 Spring Boot 실행 코드와 업무 서비스는 `app` 모듈로 이동
+- 적용: `core`, `github`, `gitlab` 패키지는 `platform` 모듈로 물리 분리
+- 적용: GitLab platform 테스트는 `platform` 모듈 테스트로 이동
+- 유지: connection / repository / issue / comment 업무 코드는 아직 `app` 모듈 내부에 위치
+- 이유: public API facade와 entity 경계가 아직 충분히 분리되지 않아 업무 모듈을 바로 물리 분리하면 순환 의존과 JPA scan 리스크가 큼
+- 다음: connection public API와 token access 경계를 만든 뒤 connection 모듈로 이동
+
+## 14. 2차 적용 상태
+
+- 적용: `connection` 모듈에 플랫폼 연결 책임 물리 이동
+- 적용: `PlatformConnection`, `User` 엔티티를 `connection` 모듈로 이동
+- 적용: `PlatformConnectionRepository`, `UserRepository`를 `connection` 모듈로 이동
+- 적용: `AuthService`, `PatCryptoService`를 `connection` 모듈로 이동
+- 적용: auth DTO와 연결/인증 관련 예외를 `connection` 모듈로 이동
+- 적용: 연결/토큰 테스트를 `connection` 모듈 테스트로 이동
+- 적용: `connection.api.PlatformConnectionFacade`를 도입해 `app`이 연결 내부 서비스 대신 공개 API를 호출
+- 적용: `CurrentConnection`, `TokenAccess` result DTO를 도입해 `app` 업무 서비스의 entity 직접 접근을 제거
+- 유지: 기존 Java package 이름은 유지
+- 유지: 외부 REST API 계약과 세션 기반 인증 흐름은 기존 동작 유지
+- 이유: 2차에서는 연결 모듈의 물리 소유권과 공개 호출 경계를 먼저 고정해 repository / issue / comment 모듈 이동 전에 token/baseUrl 접근 책임을 connection으로 모음
+- 다음: repository 모듈을 같은 방식으로 `repository.api` 경계 뒤로 이동
