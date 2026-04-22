@@ -1,21 +1,16 @@
-package com.jw.github_issue_manager.dto.issue;
+package com.jw.github_issue_manager.comment.api.dto;
 
 import java.time.LocalDateTime;
 
 import com.jw.github_issue_manager.core.platform.PlatformType;
 
-public record IssueDetailResponse(
+public record CommentResponse(
     PlatformType platform,
-    String issueId,
-    String repositoryId,
-    String numberOrKey,
-    String title,
-    String body,
-    String state,
+    String commentId,
     String authorLogin,
+    String body,
     LocalDateTime createdAt,
     LocalDateTime updatedAt,
-    LocalDateTime closedAt,
     LocalDateTime lastSyncedAt
 ) {
 }

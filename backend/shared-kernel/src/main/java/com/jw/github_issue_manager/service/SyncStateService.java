@@ -8,7 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.jw.github_issue_manager.domain.SyncResourceType;
 import com.jw.github_issue_manager.domain.SyncState;
 import com.jw.github_issue_manager.domain.SyncStatus;
-import com.jw.github_issue_manager.dto.sync.SyncStateResponse;
+import com.jw.github_issue_manager.shared.api.dto.SyncStateResponse;
 import com.jw.github_issue_manager.repository.SyncStateRepository;
 
 @Service

@@ -8,8 +8,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.connection.api.PlatformConnectionFacade;
-import com.jw.github_issue_manager.dto.auth.MeResponse;
-import com.jw.github_issue_manager.dto.auth.PlatformConnectionResponse;
+import com.jw.github_issue_manager.connection.api.dto.MeResponse;
+import com.jw.github_issue_manager.connection.api.dto.PlatformConnectionResponse;
 
 import jakarta.servlet.http.HttpSession;
 

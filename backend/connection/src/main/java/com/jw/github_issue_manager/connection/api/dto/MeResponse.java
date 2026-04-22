@@ -1,4 +1,4 @@
-package com.jw.github_issue_manager.dto.auth;
+package com.jw.github_issue_manager.connection.api.dto;
 
 import com.jw.github_issue_manager.core.platform.PlatformType;
 

@@ -1,4 +1,4 @@
-package com.jw.github_issue_manager.dto.comment;
+package com.jw.github_issue_manager.comment.api.dto;
 
 import jakarta.validation.constraints.NotBlank;
 
