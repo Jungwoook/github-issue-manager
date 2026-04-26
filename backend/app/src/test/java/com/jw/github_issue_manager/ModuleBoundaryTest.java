@@ -18,6 +18,9 @@ import org.junit.jupiter.api.Test;
 class ModuleBoundaryTest {
 
     private static final Pattern PROJECT_DEPENDENCY = Pattern.compile("project\\(':(?<module>[^']+)'\\)");
+    private static final Pattern SCOPED_PROJECT_DEPENDENCY = Pattern.compile(
+        "(?m)^\\s*(?<scope>api|implementation)\\s+project\\(':(?<module>[^']+)'\\)"
+    );
     private static final Set<String> APP_ALLOWED_API_IMPORTS = Set.of(
         "com.jw.github_issue_manager.comment.api.",
         "com.jw.github_issue_manager.connection.api.",
@@ -48,6 +51,27 @@ class ModuleBoundaryTest {
                 entry.getValue(),
                 projectDependencies(entry.getKey()),
                 entry.getKey() + " module dependencies changed; update docs and boundary rules together."
+            );
+        }
+    }
+
+    @Test
+    void gradleModuleApiDependenciesExposeOnlyPublicContracts() throws IOException {
+        Map<String, Set<String>> expectedApiDependencies = Map.of(
+            "app", Set.of(),
+            "comment", Set.of("platform"),
+            "connection", Set.of("platform"),
+            "issue", Set.of("platform", "shared-kernel"),
+            "platform", Set.of(),
+            "repository", Set.of("platform", "shared-kernel"),
+            "shared-kernel", Set.of()
+        );
+
+        for (Map.Entry<String, Set<String>> entry : expectedApiDependencies.entrySet()) {
+            assertEquals(
+                entry.getValue(),
+                projectDependenciesByScope(entry.getKey(), "api"),
+                entry.getKey() + " module api dependencies changed; keep transitive exposure intentional."
             );
         }
     }
@@ -112,6 +136,18 @@ class ModuleBoundaryTest {
         Set<String> dependencies = new java.util.TreeSet<>();
         while (matcher.find()) {
             dependencies.add(matcher.group("module"));
+        }
+        return dependencies;
+    }
+
+    private Set<String> projectDependenciesByScope(String moduleName, String scope) throws IOException {
+        String buildGradle = Files.readString(backendRoot().resolve(moduleName).resolve("build.gradle"));
+        Matcher matcher = SCOPED_PROJECT_DEPENDENCY.matcher(buildGradle);
+        Set<String> dependencies = new java.util.TreeSet<>();
+        while (matcher.find()) {
+            if (scope.equals(matcher.group("scope"))) {
+                dependencies.add(matcher.group("module"));
+            }
         }
         return dependencies;
     }
