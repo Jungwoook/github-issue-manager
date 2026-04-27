@@ -719,3 +719,93 @@ connection -> platform.api, shared
 - 유지: app 전용 health DTO와 exception response는 app 소유로 유지
 - 유지: JSON 필드와 외부 REST API 계약은 변경 없음
 - 다음: 불필요한 transitive `api` 의존을 `implementation`으로 줄이는 의존성 정리
+
+## 21. 9차 적용 상태
+
+- 적용: Gradle `api` 의존을 공개 계약 노출이 필요한 경우로 축소
+- 적용: `issue -> repository`, `comment -> issue`, `comment -> shared-kernel`, `shared-kernel -> platform` 의존을 `implementation`으로 전환
+- 적용: Gradle 의존 방향 테스트에 `api` scope 검증 추가
+- 이유: 모듈이 내부 구현에 필요한 의존을 소비자 모듈까지 전이 노출하지 않도록 제한
+- 유지: 전체 모듈 의존 방향과 REST API 계약은 변경 없음
+
+```mermaid
+graph TD
+    app["app"]
+    comment["comment"]
+    issue["issue"]
+    repository["repository"]
+    connection["connection"]
+    shared["shared-kernel"]
+    platform["platform"]
+
+    app --> comment
+    app --> issue
+    app --> repository
+    app --> connection
+    app --> shared
+    app --> platform
+
+    comment -. implementation .-> issue
+    comment -. implementation .-> repository
+    comment -. implementation .-> connection
+    comment -. implementation .-> shared
+    comment --> platform
+
+    issue -. implementation .-> repository
+    issue -. implementation .-> connection
+    issue --> shared
+    issue --> platform
+
+    repository -. implementation .-> connection
+    repository --> shared
+    repository --> platform
+
+    connection -. implementation .-> shared
+    connection --> platform
+
+    shared -. implementation .-> platform
+```
+
+## 22. 10차 적용 상태
+
+- 적용: connection / repository / issue / comment / shared-kernel 모듈별 Spring/JPA configuration 추가
+- 적용: 각 모듈이 자기 entity와 JPA repository scan 범위를 직접 선언
+- 적용: shared-kernel repository scan은 기존 `com.jw.github_issue_manager.repository` 패키지와 repository 모듈의 `repository.internal` 패키지가 겹치지 않도록 제외 규칙 추가
+- 이유: app의 루트 scan에만 기대지 않고 모듈별 persistence 경계를 명시해 이후 모듈 분리와 테스트 slice 구성을 쉽게 만들기 위함
+- 유지: app main class의 bootstrapping 방식과 기존 bean wiring은 변경 없음
+- 검증: facade bean 등록과 JPA managed entity 등록 테스트 유지
+
+```mermaid
+graph LR
+    boot["GithubIssueManagerApplication"]
+    connCfg["ConnectionModuleConfig"]
+    repoCfg["RepositoryModuleConfig"]
+    issueCfg["IssueModuleConfig"]
+    commentCfg["CommentModuleConfig"]
+    sharedCfg["SharedKernelConfig"]
+
+    boot --> connCfg
+    boot --> repoCfg
+    boot --> issueCfg
+    boot --> commentCfg
+    boot --> sharedCfg
+
+    connCfg --> connEntity["PlatformConnection / User"]
+    connCfg --> connRepo["PlatformConnectionRepository / UserRepository"]
+    repoCfg --> repoEntity["RepositoryCache"]
+    repoCfg --> repoRepo["RepositoryCacheRepository"]
+    issueCfg --> issueEntity["IssueCache"]
+    issueCfg --> issueRepo["IssueCacheRepository"]
+    commentCfg --> commentEntity["CommentCache"]
+    commentCfg --> commentRepo["CommentCacheRepository"]
+    sharedCfg --> syncEntity["SyncState"]
+    sharedCfg --> syncRepo["SyncStateRepository"]
+```
+
+## 23. 11차 적용 상태
+
+- 적용: 9차~11차 전환 결과를 설계 문서와 작업 기록에 반영
+- 적용: 후속 코드 리뷰를 위한 리뷰 문서 생성
+- 이유: Gradle 멀티 모듈 전환의 마지막 상태를 코드와 문서가 같은 기준으로 설명하도록 고정
+- 검증: `.\gradlew.bat clean :app:bootJar test`
+- 남은 후보: shared-kernel의 구 패키지(`domain`, `repository`, `service`)를 별도 후속 작업에서 `shared.internal` 계열로 정리할지 검토
