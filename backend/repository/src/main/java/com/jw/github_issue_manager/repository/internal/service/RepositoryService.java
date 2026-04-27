@@ -6,17 +6,15 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.jw.github_issue_manager.core.platform.PlatformGatewayResolver;
 import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.core.remote.RemoteRepository;
-import com.jw.github_issue_manager.connection.api.CurrentConnection;
-import com.jw.github_issue_manager.connection.api.PlatformConnectionFacade;
-import com.jw.github_issue_manager.connection.api.TokenAccess;
 import com.jw.github_issue_manager.repository.internal.domain.RepositoryCache;
 import com.jw.github_issue_manager.domain.SyncResourceType;
 import com.jw.github_issue_manager.repository.api.dto.RepositoryResponse;
 import com.jw.github_issue_manager.shared.api.dto.SyncStateResponse;
 import com.jw.github_issue_manager.exception.ResourceNotFoundException;
+import com.jw.github_issue_manager.platform.api.PlatformRemoteFacade;
+import com.jw.github_issue_manager.platform.api.dto.CurrentPlatformConnection;
 import com.jw.github_issue_manager.repository.api.RepositoryAccess;
 import com.jw.github_issue_manager.repository.internal.repository.RepositoryCacheRepository;
 import com.jw.github_issue_manager.service.SyncStateService;
@@ -27,25 +25,22 @@ import jakarta.servlet.http.HttpSession;
 public class RepositoryService {
 
     private final RepositoryCacheRepository repositoryCacheRepository;
-    private final PlatformConnectionFacade platformConnectionFacade;
     private final SyncStateService syncStateService;
-    private final PlatformGatewayResolver platformGatewayResolver;
+    private final PlatformRemoteFacade platformRemoteFacade;
 
     public RepositoryService(
         RepositoryCacheRepository repositoryCacheRepository,
-        PlatformConnectionFacade platformConnectionFacade,
         SyncStateService syncStateService,
-        PlatformGatewayResolver platformGatewayResolver
+        PlatformRemoteFacade platformRemoteFacade
     ) {
         this.repositoryCacheRepository = repositoryCacheRepository;
-        this.platformConnectionFacade = platformConnectionFacade;
         this.syncStateService = syncStateService;
-        this.platformGatewayResolver = platformGatewayResolver;
+        this.platformRemoteFacade = platformRemoteFacade;
     }
 
     @Transactional(readOnly = true)
     public List<RepositoryResponse> getRepositories(PlatformType platform, HttpSession session) {
-        String login = platformConnectionFacade.requireCurrentConnection(platform, session).accountLogin();
+        String login = platformRemoteFacade.requireCurrentConnection(platform, session).accountLogin();
         return repositoryCacheRepository.findByPlatformAndOwnerKeyOrderByFullNameAsc(platform, login).stream()
             .map(this::toResponse)
             .toList();
@@ -53,14 +48,13 @@ public class RepositoryService {
 
     @Transactional
     public List<RepositoryResponse> refreshRepositories(PlatformType platform, HttpSession session) {
-        TokenAccess tokenAccess = platformConnectionFacade.requireTokenAccess(platform, session);
-        List<RemoteRepository> repositories = platformGatewayResolver.getGateway(platform)
-            .getAccessibleRepositories(tokenAccess.accessToken(), tokenAccess.baseUrl());
+        CurrentPlatformConnection connection = platformRemoteFacade.requireCurrentConnection(platform, session);
+        List<RemoteRepository> repositories = platformRemoteFacade.getAccessibleRepositories(platform, session);
         repositories.forEach(this::upsertRepository);
 
         syncStateService.recordSuccess(
             SyncResourceType.REPOSITORY_LIST,
-            platform.name() + ":" + tokenAccess.accountLogin(),
+            platform.name() + ":" + connection.accountLogin(),
             "Repository cache refreshed."
         );
 
@@ -84,7 +78,7 @@ public class RepositoryService {
     }
 
     private RepositoryCache requireAccessibleRepositoryCache(PlatformType platform, String repositoryId, HttpSession session) {
-        CurrentConnection connection = platformConnectionFacade.requireCurrentConnection(platform, session);
+        CurrentPlatformConnection connection = platformRemoteFacade.requireCurrentConnection(platform, session);
         RepositoryCache repository = repositoryCacheRepository.findByPlatformAndExternalId(platform, repositoryId)
             .orElseThrow(() -> new ResourceNotFoundException("REPOSITORY_NOT_FOUND", "Repository was not found."));
 
