@@ -6,7 +6,7 @@ import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.connection.api.dto.MeResponse;
 import com.jw.github_issue_manager.connection.api.dto.PlatformConnectionResponse;
 import com.jw.github_issue_manager.connection.api.dto.PlatformTokenStatusResponse;
-import com.jw.github_issue_manager.connection.api.dto.RegisterPlatformTokenRequest;
+import com.jw.github_issue_manager.connection.api.dto.RegisterValidatedPlatformTokenCommand;
 import com.jw.github_issue_manager.connection.internal.service.AuthService;
 
 import jakarta.servlet.http.HttpSession;
@@ -20,8 +20,12 @@ public class PlatformConnectionFacade {
         this.authService = authService;
     }
 
-    public MeResponse registerPlatformToken(PlatformType platform, RegisterPlatformTokenRequest request, HttpSession session) {
-        return authService.registerPlatformToken(platform, request, session);
+    public MeResponse registerPlatformToken(
+        PlatformType platform,
+        RegisterValidatedPlatformTokenCommand command,
+        HttpSession session
+    ) {
+        return authService.registerPlatformToken(platform, command, session);
     }
 
     public MeResponse getCurrentUser(HttpSession session) {

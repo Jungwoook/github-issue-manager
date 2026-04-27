@@ -1,15 +1,11 @@
 package com.jw.github_issue_manager.connection.internal.service;
 
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.jw.github_issue_manager.core.platform.PlatformGatewayResolver;
 import com.jw.github_issue_manager.core.platform.PlatformType;
-import com.jw.github_issue_manager.core.remote.RemoteUserProfile;
 import com.jw.github_issue_manager.connection.api.CurrentConnection;
 import com.jw.github_issue_manager.connection.api.TokenAccess;
 import com.jw.github_issue_manager.connection.internal.domain.PlatformConnection;
@@ -17,7 +13,7 @@ import com.jw.github_issue_manager.connection.internal.domain.User;
 import com.jw.github_issue_manager.connection.api.dto.MeResponse;
 import com.jw.github_issue_manager.connection.api.dto.PlatformConnectionResponse;
 import com.jw.github_issue_manager.connection.api.dto.PlatformTokenStatusResponse;
-import com.jw.github_issue_manager.connection.api.dto.RegisterPlatformTokenRequest;
+import com.jw.github_issue_manager.connection.api.dto.RegisterValidatedPlatformTokenCommand;
 import com.jw.github_issue_manager.exception.UnauthorizedException;
 import com.jw.github_issue_manager.connection.internal.repository.PlatformConnectionRepository;
 import com.jw.github_issue_manager.connection.internal.repository.UserRepository;
@@ -32,34 +28,32 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PlatformConnectionRepository platformConnectionRepository;
-    private final PlatformGatewayResolver platformGatewayResolver;
     private final PatCryptoService patCryptoService;
 
     public AuthService(
         UserRepository userRepository,
         PlatformConnectionRepository platformConnectionRepository,
-        PlatformGatewayResolver platformGatewayResolver,
         PatCryptoService patCryptoService
     ) {
         this.userRepository = userRepository;
         this.platformConnectionRepository = platformConnectionRepository;
-        this.platformGatewayResolver = platformGatewayResolver;
         this.patCryptoService = patCryptoService;
     }
 
     @Transactional
-    public MeResponse registerPlatformToken(PlatformType platform, RegisterPlatformTokenRequest request, HttpSession session) {
-        String baseUrl = resolvePlatformBaseUrl(platform, request.baseUrl());
-        RemoteUserProfile userProfile = platformGatewayResolver.getGateway(platform)
-            .getAuthenticatedUser(request.accessToken(), baseUrl);
-        String encryptedToken = patCryptoService.encrypt(request.accessToken());
+    public MeResponse registerPlatformToken(
+        PlatformType platform,
+        RegisterValidatedPlatformTokenCommand command,
+        HttpSession session
+    ) {
+        String encryptedToken = patCryptoService.encrypt(command.accessToken());
         LocalDateTime now = LocalDateTime.now();
         PlatformConnection connection = platformConnectionRepository.findByPlatformAndExternalUserId(
                 platform,
-                userProfile.externalUserId()
+                command.externalUserId()
             )
-            .map(existing -> updateExistingConnection(platform, existing, userProfile, encryptedToken, baseUrl, now))
-            .orElseGet(() -> createConnection(platform, userProfile, encryptedToken, baseUrl, now));
+            .map(existing -> updateExistingConnection(platform, existing, command, encryptedToken, now))
+            .orElseGet(() -> createConnection(platform, command, encryptedToken, now));
 
         connection.touchAuthentication();
         session.setAttribute(CURRENT_USER_ID, connection.getUser().getId());
@@ -157,18 +151,17 @@ public class AuthService {
     private PlatformConnection updateExistingConnection(
         PlatformType platform,
         PlatformConnection connection,
-        RemoteUserProfile userProfile,
+        RegisterValidatedPlatformTokenCommand command,
         String encryptedToken,
-        String baseUrl,
         LocalDateTime verifiedAt
     ) {
         User user = connection.getUser();
-        user.setDisplayName(resolveDisplayName(userProfile));
-        user.setEmail(userProfile.email());
-        connection.setAccountLogin(userProfile.login());
-        connection.setAvatarUrl(userProfile.avatarUrl());
+        user.setDisplayName(resolveDisplayName(command));
+        user.setEmail(command.email());
+        connection.setAccountLogin(command.login());
+        connection.setAvatarUrl(command.avatarUrl());
         connection.setTokenScopes(defaultTokenScopes(platform));
-        connection.setBaseUrl(baseUrl);
+        connection.setBaseUrl(command.baseUrl());
         connection.setAccessTokenEncrypted(encryptedToken);
         connection.markTokenVerified(verifiedAt);
         return connection;
@@ -176,72 +169,23 @@ public class AuthService {
 
     private PlatformConnection createConnection(
         PlatformType platform,
-        RemoteUserProfile userProfile,
+        RegisterValidatedPlatformTokenCommand command,
         String encryptedToken,
-        String baseUrl,
         LocalDateTime verifiedAt
     ) {
-        User user = userRepository.save(new User(resolveDisplayName(userProfile), userProfile.email()));
+        User user = userRepository.save(new User(resolveDisplayName(command), command.email()));
         PlatformConnection connection = new PlatformConnection(
             user,
             platform,
-            userProfile.externalUserId(),
-            userProfile.login(),
-            userProfile.avatarUrl(),
+            command.externalUserId(),
+            command.login(),
+            command.avatarUrl(),
             encryptedToken,
             defaultTokenScopes(platform),
-            baseUrl
+            command.baseUrl()
         );
         connection.markTokenVerified(verifiedAt);
         return platformConnectionRepository.save(connection);
-    }
-
-    public String resolvePlatformBaseUrl(PlatformType platform, String requestedBaseUrl) {
-        if (platform == PlatformType.GITLAB) {
-            if (requestedBaseUrl == null || requestedBaseUrl.isBlank()) {
-                return "https://gitlab.com/api/v4";
-            }
-            return normalizeGitLabBaseUrl(requestedBaseUrl);
-        }
-        return null;
-    }
-
-    private String normalizeGitLabBaseUrl(String requestedBaseUrl) {
-        try {
-            URI uri = new URI(requestedBaseUrl.trim());
-
-            if (!"https".equalsIgnoreCase(uri.getScheme())) {
-                throw new IllegalArgumentException("GitLab baseUrl must use HTTPS.");
-            }
-            if (uri.getHost() == null || uri.getHost().isBlank()) {
-                throw new IllegalArgumentException("GitLab baseUrl must include a valid host.");
-            }
-            if (uri.getQuery() != null || uri.getFragment() != null) {
-                throw new IllegalArgumentException("GitLab baseUrl must not include query parameters or fragments.");
-            }
-
-            String path = uri.getPath();
-            if (path == null || path.isBlank() || "/".equals(path)) {
-                path = "/api/v4";
-            } else {
-                path = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
-                if (!path.endsWith("/api/v4")) {
-                    path = path + "/api/v4";
-                }
-            }
-
-            return new URI(
-                uri.getScheme().toLowerCase(),
-                uri.getUserInfo(),
-                uri.getHost().toLowerCase(),
-                uri.getPort(),
-                path,
-                null,
-                null
-            ).toString();
-        } catch (URISyntaxException | IllegalArgumentException exception) {
-            throw new IllegalArgumentException("GitLab baseUrl must be a valid HTTPS API base URL.", exception);
-        }
     }
 
     private String defaultTokenScopes(PlatformType platform) {
@@ -251,10 +195,10 @@ public class AuthService {
         };
     }
 
-    private String resolveDisplayName(RemoteUserProfile userProfile) {
-        return userProfile.displayName() == null || userProfile.displayName().isBlank()
-            ? userProfile.login()
-            : userProfile.displayName();
+    private String resolveDisplayName(RegisterValidatedPlatformTokenCommand command) {
+        return command.displayName() == null || command.displayName().isBlank()
+            ? command.login()
+            : command.displayName();
     }
 
     private MeResponse toMeResponse(PlatformConnection connection) {
