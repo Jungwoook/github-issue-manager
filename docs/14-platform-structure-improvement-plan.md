@@ -232,6 +232,17 @@ sequenceDiagram
 
 ## 9. 보류 사항
 
-- `connectionId`를 platform remote command에 직접 노출할지, 공통 reference 타입으로 감쌀지 결정 필요
-- 검증된 remote user profile을 connection register command에 어떤 DTO로 전달할지 결정 필요
-- 현재 Gradle 의존성과 코드 구조가 13번 기준으로 이미 진행된 상태이므로 실제 변경은 별도 단계로 작게 나누어야 함
+- 원격 호출 command를 세션 기반에서 `connectionId` 또는 공통 connection reference 기반으로 바꿀지 후속 검토
+- `PlatformType`의 패키지명을 장기적으로 shared-kernel 성격에 맞게 정리할지 후속 검토
+
+## 10. 적용 상태
+
+- 적용: PAT 등록 흐름을 app 조립 방식으로 전환
+- 적용: platform credential 검증 API 추가
+- 적용: connection 등록 API는 검증된 remote user profile과 token 저장만 담당하도록 축소
+- 적용: 원격 호출 token/baseUrl 조회를 platform 내부로 이동
+- 적용: repository / issue / comment의 connection 직접 의존 제거
+- 적용: platform -> connection, connection -> shared-kernel 방향으로 Gradle 의존성 정리
+- 적용: 모듈 경계 테스트에 업무 모듈 -> connection 금지, connection -> platform 금지 규칙 추가
+- 검증: `.\gradlew.bat test`
+- 후속: 세션 기반 remote command를 명시적 connection reference로 바꿀지 검토
