@@ -92,9 +92,9 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     participant C as RepositoryController
-    participant Repo as repository.api
-    participant Plat as platform.api
-    participant Conn as connection.api
+    participant Repo as repository
+    participant Plat as platform
+    participant Conn as connection
     participant DB as repository DB
 
     C->>Repo: RefreshRepositoriesCommand
@@ -109,15 +109,16 @@ sequenceDiagram
 - repository: 저장소 캐시와 refresh 유스케이스만 소유
 - platform: token access 조회와 GitHub/GitLab 원격 호출 소유
 - connection: token 원문과 암호화 저장 방식 소유
+- 모듈 간 호출은 각 모듈의 `*.api` 공개 계약을 통해 수행
 
 ### 5.2 이슈 / 댓글 변경
 
 ```mermaid
 sequenceDiagram
-    participant UseCase as issue/comment.api
-    participant Parent as repository/issue.api
-    participant Plat as platform.api
-    participant Conn as connection.api
+    participant UseCase as issue/comment
+    participant Parent as repository/issue
+    participant Plat as platform
+    participant Conn as connection
     participant DB as module DB
 
     UseCase->>Parent: parent access 확인
@@ -131,6 +132,7 @@ sequenceDiagram
 - issue: repository 존재와 접근 가능 여부만 확인
 - comment: issue 존재와 접근 가능 여부만 확인
 - issue/comment: token/baseUrl 조회 방식은 모름
+- 모듈 간 호출은 각 모듈의 `*.api` 공개 계약을 통해 수행
 
 ## 6. PAT 등록 흐름 선택지
 
