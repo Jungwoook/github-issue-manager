@@ -180,54 +180,39 @@ sequenceDiagram
 
 ## 7. 전환 계획
 
-전환은 기존 GitHub 흐름을 유지하면서 의존 방향만 단계적으로 바꾼다. 각 단계는 테스트 가능한 중간 상태를 남긴다.
+전환은 기존 GitHub 흐름을 유지하면서 의존 방향만 단계적으로 바꾼다. 준비성 작업은 각 단계에 포함하고, 테스트 가능한 중간 상태를 남긴다.
 
-### 7.1 1단계: platform credential 검증 API 추가
+### 7.1 1단계: PAT 등록 흐름 재배치
 
-- 대상: platform
-- 작업: token/baseUrl 검증용 public API 추가
-- 작업: GitHub/GitLab remote user profile 조회를 platform 내부로 유지
-- 작업: 검증 결과를 connection 저장에 필요한 중립 result로 반환
-- 유지: 기존 connection 등록 API는 아직 제거하지 않음
-- 검증: GitHub/GitLab token 검증 테스트 유지 또는 추가
-
-### 7.2 2단계: app 등록 조립으로 전환
-
-- 대상: app, connection
+- 대상: app, platform, connection
+- 작업: platform에 token/baseUrl 검증용 public API 추가
 - 작업: AuthController가 platform 검증 후 connection 저장을 호출
 - 작업: connection register command는 검증된 remote user profile을 입력으로 받음
 - 작업: connection 내부의 platformGatewayResolver 의존 제거
 - 유지: 응답 DTO와 프론트 API 계약은 변경하지 않음
 - 검증: PAT 등록, 상태 조회, logout 흐름 회귀 테스트
 
-### 7.3 3단계: platform remote API 재정의
+### 7.2 2단계: 원격 호출 경계 재정의
 
 - 대상: platform, repository, issue, comment
 - 작업: remote 호출 command에 token/baseUrl 대신 connection reference 전달
 - 작업: platform application service가 connection.api로 token access 조회
+- 작업: repository / issue / comment의 PlatformConnectionFacade 직접 호출 제거
 - 작업: GitHub/GitLab adapter에는 검증된 credential만 전달
-- 유지: 외부 REST API 요청/응답 형식은 변경하지 않음
+- 유지: parent access 확인은 repository.api, issue.api 기준으로 유지
 - 검증: 저장소 refresh, 이슈 생성/수정, 댓글 작성 테스트
 
-### 7.4 4단계: 업무 모듈의 connection 직접 의존 제거
+### 7.3 3단계: Gradle 의존성과 경계 테스트 정리
 
-- 대상: repository, issue, comment
-- 작업: repository / issue / comment의 PlatformConnectionFacade 주입 제거
-- 작업: token/baseUrl 조회 코드를 platform 호출로 이동
-- 작업: Gradle 의존성에서 repository / issue / comment -> connection 제거
-- 유지: parent access 확인은 repository.api, issue.api 기준으로 유지
-- 검증: 모듈 경계 테스트에서 업무 모듈 -> connection 금지
-
-### 7.5 5단계: 모듈 경계 테스트 갱신
-
-- 대상: app test
+- 대상: Gradle, app test
+- 작업: repository / issue / comment -> connection Gradle 의존 제거
 - 작업: platform -> connection 허용 규칙 추가
 - 작업: connection -> platform 금지 규칙 추가
 - 작업: repository / issue / comment -> connection 금지 규칙 추가
 - 작업: GitHub/GitLab adapter 외부 참조 금지 규칙 유지
 - 검증: 전체 backend test
 
-### 7.6 6단계: 문서와 적용 상태 정리
+### 7.4 4단계: 문서와 적용 상태 정리
 
 - 대상: docs
 - 작업: 13번은 기존 전환 이력으로 유지
