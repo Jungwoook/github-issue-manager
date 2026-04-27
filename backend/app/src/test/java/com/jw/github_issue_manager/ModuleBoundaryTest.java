@@ -38,12 +38,12 @@ class ModuleBoundaryTest {
     void gradleModuleDependenciesFollowDocumentedDirection() throws IOException {
         Map<String, Set<String>> expectedDependencies = Map.of(
             "app", Set.of("comment", "connection", "issue", "platform", "repository", "shared-kernel"),
-            "comment", Set.of("connection", "issue", "platform", "repository", "shared-kernel"),
-            "connection", Set.of("platform", "shared-kernel"),
-            "issue", Set.of("connection", "platform", "repository", "shared-kernel"),
-            "platform", Set.of(),
-            "repository", Set.of("connection", "platform", "shared-kernel"),
-            "shared-kernel", Set.of("platform")
+            "comment", Set.of("issue", "platform", "repository", "shared-kernel"),
+            "connection", Set.of("shared-kernel"),
+            "issue", Set.of("platform", "repository", "shared-kernel"),
+            "platform", Set.of("connection", "shared-kernel"),
+            "repository", Set.of("platform", "shared-kernel"),
+            "shared-kernel", Set.of()
         );
 
         for (Map.Entry<String, Set<String>> entry : expectedDependencies.entrySet()) {
@@ -60,9 +60,9 @@ class ModuleBoundaryTest {
         Map<String, Set<String>> expectedApiDependencies = Map.of(
             "app", Set.of(),
             "comment", Set.of("platform"),
-            "connection", Set.of("platform"),
+            "connection", Set.of("shared-kernel"),
             "issue", Set.of("platform", "shared-kernel"),
-            "platform", Set.of(),
+            "platform", Set.of("shared-kernel"),
             "repository", Set.of("platform", "shared-kernel"),
             "shared-kernel", Set.of()
         );
@@ -106,6 +106,32 @@ class ModuleBoundaryTest {
         assertTrue(
             violations.isEmpty(),
             "public api packages must not depend on other module internals: " + violations
+        );
+    }
+
+    @Test
+    void businessModulesDoNotDependOnConnectionModule() throws IOException {
+        List<String> violations = Stream.of("repository", "issue", "comment")
+            .flatMap(moduleName -> importsFromModule(moduleName)
+                .filter(importLine -> importLine.startsWith("import com.jw.github_issue_manager.connection."))
+                .map(importLine -> moduleName + ": " + importLine))
+            .toList();
+
+        assertTrue(
+            violations.isEmpty(),
+            "business modules must call remote platform APIs through platform module: " + violations
+        );
+    }
+
+    @Test
+    void connectionModuleDoesNotDependOnPlatformModuleApi() throws IOException {
+        List<String> violations = importsFromModule("connection")
+            .filter(importLine -> importLine.startsWith("import com.jw.github_issue_manager.platform."))
+            .toList();
+
+        assertTrue(
+            violations.isEmpty(),
+            "connection module must not depend on platform module APIs: " + violations
         );
     }
 
@@ -159,6 +185,17 @@ class ModuleBoundaryTest {
                 .filter(line -> line.startsWith("import "));
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to read " + sourceFile, exception);
+        }
+    }
+
+    private Stream<String> importsFromModule(String moduleName) {
+        Path moduleSourceRoot = backendRoot().resolve(moduleName).resolve("src/main/java");
+        try {
+            return Files.walk(moduleSourceRoot)
+                .filter(path -> path.toString().endsWith(".java"))
+                .flatMap(this::importsFrom);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to inspect source imports for " + moduleName, exception);
         }
     }
 
