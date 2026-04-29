@@ -45,7 +45,7 @@ flowchart TD
 - platform: credential 검증, 원격 API 호출, adapter 선택
 - connection: token 저장, 암호화, 현재 연결 조회, token access 제공
 - repository / issue / comment: 자기 cache와 업무 유스케이스 소유
-- shared-kernel: 공통 식별자, sync 상태, 최소 공통 타입
+- shared-kernel: sync 상태, 공통 exception, 공통 response DTO
 
 ## 2. app
 
@@ -74,7 +74,8 @@ sequenceDiagram
 - `PlatformCredentialFacade`: PAT/baseUrl 검증, remote user profile 조회, GitLab baseUrl 정규화
 - `PlatformRemoteFacade`: repository/issue/comment 원격 API 호출의 단일 관문
 - 내부 구성: `PlatformGatewayResolver`, GitHub/GitLab gateway
-- 사용 의존: connection token access, shared PlatformType
+- 사용 의존: connection token access, shared-kernel
+- 소유: `PlatformType`, remote DTO, gateway 계약
 
 ### 원격 호출 흐름
 
@@ -129,9 +130,9 @@ sequenceDiagram
 ## 8. shared-kernel
 
 - 주요 서비스: `SyncStateService`
-- 소유: sync 상태, 공통 exception, 공통 response DTO, `PlatformType`
+- 소유: sync 상태, 공통 exception, 공통 response DTO
 - 제한: 업무 규칙과 외부 API DTO를 추가하지 않는다.
-- 후속 후보: `PlatformType` 패키지명을 shared-kernel 성격에 맞게 정리
+- 참고: `PlatformType`은 현재 platform 모듈 소유이며 shared-kernel 소유가 아니다.
 
 ## 9. 검증 기준
 

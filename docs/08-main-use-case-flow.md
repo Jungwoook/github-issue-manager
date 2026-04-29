@@ -1,75 +1,77 @@
-# GitHub Issue Manager 메인 유스케이스 동작 흐름
+# Main Use Case Flow
 
 ## 1. 문서 목적
 
-이 문서는 현재 구현 기준으로 GitHub Issue Manager의 메인 유스케이스가 어떻게 동작하는지 한 번에 이해할 수 있도록 정리한 문서다.
+이 문서는 현재 구현 기준으로 사용자가 플랫폼 PAT를 등록한 뒤 저장소, 이슈, 댓글을 사용하는 전체 흐름을 정리한다.
 
-대표 시나리오는 아래 순서로 본다.
+현재 구현의 핵심은 다음과 같다.
 
-1. 사용자가 GitHub PAT를 등록한다.
-2. 앱이 접근 가능한 저장소 목록을 동기화한다.
-3. 사용자가 저장소를 선택해 이슈 목록과 상세를 조회한다.
-4. 사용자가 이슈를 생성하거나 상태를 변경한다.
-5. 사용자가 댓글을 동기화하거나 새 댓글을 작성한다.
+- 프론트는 기본적으로 `github` 플랫폼을 사용한다.
+- API는 `/api/platforms/{platform}/...` 경로를 사용한다.
+- 플랫폼별 원격 호출은 platform 모듈의 gateway 뒤로 숨겨져 있다.
+- connection 모듈은 세션과 암호화된 PAT를 관리한다.
+- repository, issue, comment 모듈은 로컬 캐시를 읽고 쓰며 필요한 시점에 platform 모듈을 호출한다.
 
-이 흐름은 현재 프론트엔드 화면, 백엔드 서비스, 캐시 테이블, GitHub REST API가 가장 촘촘하게 연결된 핵심 사용자 여정이다.
+## 2. 전체 흐름 요약
 
-## 2. 메인 유스케이스 한 줄 요약
-
-사용자는 GitHub PAT를 한 번 연결한 뒤, 앱 내부 캐시를 기준으로 저장소와 이슈를 탐색하고, 필요한 시점에 GitHub와 다시 동기화하거나 직접 이슈/댓글을 생성 및 수정한다.
+1. 사용자가 플랫폼 PAT를 등록한다.
+2. 백엔드가 플랫폼 API로 토큰을 검증하고 세션을 연결한다.
+3. 사용자가 저장소 새로고침으로 접근 가능한 저장소를 캐시에 반영한다.
+4. 사용자가 저장소를 선택하고 이슈 목록을 조회한다.
+5. 필요하면 이슈 새로고침으로 원격 이슈를 캐시에 반영한다.
+6. 사용자가 이슈를 생성, 조회, 수정, 닫기 처리한다.
+7. 사용자가 댓글을 새로고침하거나 댓글을 작성한다.
+8. 연결 해제 또는 로그아웃으로 세션 흐름을 종료한다.
 
 ## 3. 주요 구성 요소
 
-- 프론트엔드: React + React Query 기반 화면과 API 호출
-- 백엔드 API: Spring Boot REST 컨트롤러
-- 도메인 서비스: 인증, 저장소, 이슈, 댓글, 동기화 상태 관리
-- 로컬 저장소: `github_accounts`, `repository_caches`, `issue_caches`, `comment_caches`, `sync_states`
-- 외부 시스템: GitHub REST API
+- Frontend: React, React Query, platform-aware API client
+- App API: Spring MVC controller
+- Connection: 사용자, 플랫폼 연결, PAT 암호화, 세션 관리
+- Repository: 저장소 캐시, 저장소 접근 검증
+- Issue: 이슈 캐시, 이슈 조회/생성/수정/닫기
+- Comment: 댓글 캐시, 댓글 조회/작성
+- Platform: `PlatformCredentialFacade`, `PlatformRemoteFacade`, 플랫폼 gateway
+- Shared Kernel: 동기화 상태 기록과 조회
+- External Platform: GitHub 또는 GitLab API
 
 ## 4. 전체 Flowchart
 
 ```mermaid
 flowchart TD
-    A["사용자: PAT 입력"] --> B["프론트: /settings/github\nGitHubTokenForm"]
-    B --> C["POST /api/github/token"]
-    C --> D["AuthService.registerGitHubToken"]
-    D --> E["GitHub /user 호출로 PAT 검증"]
-    E --> F["PAT 암호화 후 github_accounts 저장\n세션에 currentUserId 저장"]
-    F --> G["프론트 성공 처리"]
-    G --> H["POST /api/repositories/refresh"]
-    H --> I["RepositoryService.refreshRepositories"]
-    I --> J["GitHub /user/repos 호출"]
-    J --> K["repository_caches upsert"]
-    K --> L["GET /api/repositories"]
-    L --> M["저장소 목록 화면 표시"]
-    M --> N["사용자: 저장소 선택"]
-    N --> O["GET /api/repositories/{repositoryId}/issues"]
-    O --> P["issue_caches 기반 이슈 목록 조회"]
-    N --> Q["POST /api/repositories/{repositoryId}/issues/refresh"]
-    Q --> R["IssueService.refreshIssues"]
-    R --> S["GitHub /repos/{owner}/{repo}/issues 호출"]
-    S --> T["issue_caches upsert"]
-    T --> O
-    O --> U["사용자: 이슈 상세 진입"]
-    U --> V["GET /api/repositories/{repositoryId}/issues/{issueNumber}"]
-    V --> W["GET /api/repositories/{repositoryId}/issues/{issueNumber}/comments"]
-    W --> X["comment_caches 기반 댓글 조회"]
-    U --> Y["POST /api/repositories/{repositoryId}/issues/{issueNumber}/comments/refresh"]
-    Y --> Z["GitHub comments API 호출"]
-    Z --> AA["comment_caches upsert"]
-    AA --> W
-    O --> AB["사용자: 새 이슈 작성"]
-    AB --> AC["POST /api/repositories/{repositoryId}/issues"]
-    AC --> AD["GitHub issue 생성 API 호출"]
-    AD --> AE["issue_caches 반영 후 상세 화면 이동"]
-    U --> AF["사용자: 상태 변경 또는 닫기"]
-    AF --> AG["PATCH/DELETE issue API"]
-    AG --> AH["GitHub issue 수정 API 호출"]
-    AH --> AI["issue_caches 갱신"]
-    U --> AJ["사용자: 댓글 작성"]
-    AJ --> AK["POST /comments"]
-    AK --> AL["GitHub comment 생성 API 호출"]
-    AL --> AM["comment_caches 반영"]
+    A["사용자: 플랫폼 PAT 입력"] --> B["POST /api/platforms/{platform}/token"]
+    B --> C["PlatformCredentialFacade: 토큰 검증"]
+    C --> D["PlatformGateway: 원격 사용자 조회"]
+    D --> E["Connection: 사용자/연결 저장 + 세션 연결"]
+    E --> F["GET /api/me 또는 token/status"]
+    F --> G["POST /api/platforms/{platform}/repositories/refresh"]
+    G --> H["PlatformRemoteFacade: 원격 저장소 조회"]
+    H --> I["Repository: repository_caches upsert"]
+    I --> J["GET /api/platforms/{platform}/repositories"]
+    J --> K["사용자: 저장소 선택"]
+    K --> L["GET /api/platforms/{platform}/repositories/{repositoryId}"]
+    K --> M["POST /api/platforms/{platform}/repositories/{repositoryId}/issues/refresh"]
+    M --> N["PlatformRemoteFacade: 원격 이슈 조회"]
+    N --> O["Issue: issue_caches upsert"]
+    O --> P["GET /api/platforms/{platform}/repositories/{repositoryId}/issues"]
+    P --> Q["사용자: 이슈 상세 진입"]
+    Q --> R["GET /api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}"]
+    R --> S["GET /api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}/comments"]
+    Q --> T["POST comments/refresh"]
+    T --> U["PlatformRemoteFacade: 원격 댓글 조회"]
+    U --> V["Comment: comment_caches upsert"]
+    P --> W["POST issues: 이슈 생성"]
+    W --> X["PlatformRemoteFacade: 원격 이슈 생성"]
+    X --> O
+    R --> Y["PATCH issue: 이슈 수정"]
+    Y --> Z["PlatformRemoteFacade: 원격 이슈 수정"]
+    Z --> O
+    R --> AA["DELETE issue: 이슈 닫기"]
+    AA --> AB["PlatformRemoteFacade: 상태 CLOSED 변경"]
+    AB --> M
+    S --> AC["POST comments: 댓글 작성"]
+    AC --> AD["PlatformRemoteFacade: 원격 댓글 생성"]
+    AD --> V
 ```
 
 ## 5. 전체 Sequence Diagram
@@ -78,187 +80,144 @@ flowchart TD
 sequenceDiagram
     actor U as User
     participant F as Frontend
-    participant A as AuthController/AuthService
-    participant R as RepositoryService
-    participant I as IssueService
-    participant C as CommentService
-    participant DB as Cache/DB
-    participant GH as GitHub API
+    participant API as App API
+    participant Conn as Connection
+    participant Repo as Repository
+    participant Issue as Issue
+    participant Comment as Comment
+    participant Platform as Platform Gateway
+    participant DB as Local Cache/DB
+    participant Remote as Platform API
 
-    U->>F: PAT 입력 및 등록
-    F->>A: POST /api/github/token
-    A->>GH: GET /user
-    GH-->>A: GitHub 사용자 정보
-    A->>DB: github_accounts 저장, 세션 연결
-    A-->>F: 로그인 사용자 응답
+    U->>F: PAT 등록
+    F->>API: POST /api/platforms/{platform}/token
+    API->>Platform: validateCredential(platform, token, baseUrl)
+    Platform->>Remote: 현재 사용자 조회
+    Remote-->>Platform: 사용자 프로필
+    API->>Conn: registerPlatformToken(...)
+    Conn->>DB: 사용자/연결 저장, PAT 암호화
+    Conn-->>API: MeResponse
+    API-->>F: 현재 사용자 정보
 
-    F->>R: POST /api/repositories/refresh
-    R->>DB: 세션 사용자 조회
-    R->>GH: GET /user/repos
-    GH-->>R: 접근 가능한 저장소 목록
-    R->>DB: repository_caches upsert
-    R-->>F: 저장소 목록 반환
+    U->>F: 저장소 새로고침
+    F->>API: POST /api/platforms/{platform}/repositories/refresh
+    API->>Repo: refreshRepositories(platform, session)
+    Repo->>Platform: getAccessibleRepositories(platform, session)
+    Platform->>Remote: 저장소 목록 조회
+    Remote-->>Platform: 원격 저장소 목록
+    Repo->>DB: repository_caches upsert, sync-state 기록
+    Repo-->>API: 저장소 목록
+    API-->>F: 저장소 목록
 
     U->>F: 저장소 선택
-    F->>I: POST /api/repositories/{repositoryId}/issues/refresh
-    I->>DB: 저장소 접근 권한 확인
-    I->>GH: GET /repos/{owner}/{repo}/issues
-    GH-->>I: 이슈 목록
-    I->>DB: issue_caches upsert
-    I-->>F: 이슈 목록 반환
+    F->>API: POST /api/platforms/{platform}/repositories/{repositoryId}/issues/refresh
+    API->>Issue: refreshIssues(platform, repositoryId, session)
+    Issue->>Repo: requireAccessibleRepository(...)
+    Issue->>Platform: getRepositoryIssues(...)
+    Platform->>Remote: 이슈 목록 조회
+    Remote-->>Platform: 원격 이슈 목록
+    Issue->>DB: issue_caches upsert, sync-state 기록
+    Issue-->>API: 이슈 목록
+    API-->>F: 이슈 목록
 
     U->>F: 이슈 상세 진입
-    F->>I: GET /api/repositories/{repositoryId}/issues/{issueNumber}
-    I->>DB: issue_caches 조회
-    I-->>F: 이슈 상세 반환
+    F->>API: GET /api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}
+    API->>Issue: getIssue(...)
+    Issue->>DB: issue_caches 조회
+    Issue-->>API: 이슈 상세
+    API-->>F: 이슈 상세
 
-    F->>C: GET /api/repositories/{repositoryId}/issues/{issueNumber}/comments
-    C->>DB: comment_caches 조회
-    C-->>F: 댓글 목록 반환
+    F->>API: GET /api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}/comments
+    API->>Comment: getComments(...)
+    Comment->>Issue: requireIssue(...)
+    Comment->>DB: comment_caches 조회
+    Comment-->>API: 댓글 목록
+    API-->>F: 댓글 목록
 
-    U->>F: 새 이슈 생성
-    F->>I: POST /api/repositories/{repositoryId}/issues
-    I->>GH: POST /repos/{owner}/{repo}/issues
-    GH-->>I: 생성된 이슈
-    I->>DB: issue_caches 반영
-    I-->>F: 생성된 이슈 상세 반환
-
-    U->>F: 이슈 상태 변경 또는 닫기
-    F->>I: PATCH or DELETE /issues/{issueNumber}
-    I->>GH: PATCH /repos/{owner}/{repo}/issues/{issueNumber}
-    GH-->>I: 수정된 이슈
-    I->>DB: issue_caches 갱신
-    I-->>F: 변경 결과 반환
-
-    U->>F: 댓글 새로고침
-    F->>C: POST /comments/refresh
-    C->>GH: GET /repos/{owner}/{repo}/issues/{issueNumber}/comments
-    GH-->>C: 최신 댓글 목록
-    C->>DB: comment_caches upsert
-    C-->>F: 댓글 목록 반환
-
-    U->>F: 댓글 작성
-    F->>C: POST /comments
-    C->>GH: POST /repos/{owner}/{repo}/issues/{issueNumber}/comments
-    GH-->>C: 생성된 댓글
-    C->>DB: comment_caches 반영
-    C-->>F: 생성된 댓글 반환
+    U->>F: 이슈 생성/수정/닫기 또는 댓글 작성
+    F->>API: 변경 API 호출
+    API->>Issue: 이슈 변경이면 IssueFacade 호출
+    API->>Comment: 댓글 변경이면 CommentFacade 호출
+    Issue->>Platform: 원격 이슈 생성/수정/닫기
+    Comment->>Platform: 원격 댓글 생성
+    Platform->>Remote: 플랫폼 API 호출
+    Remote-->>Platform: 변경 결과
+    Issue->>DB: issue_caches 및 sync-state 갱신
+    Comment->>DB: comment_caches 및 sync-state 갱신
+    API-->>F: 변경 결과
 ```
 
-## 6. 단계별 상세 흐름
+## 6. 단계별 동작
 
-### 5.1 PAT 등록과 세션 연결
+### 6.1 플랫폼 토큰 등록
 
-사용자는 설정 화면에서 PAT를 입력한다. 프론트는 `POST /api/github/token`으로 토큰을 전송하고, 백엔드의 `AuthService.registerGitHubToken(...)`는 먼저 GitHub `/user` API를 호출해 토큰이 유효한지 확인한다.
+프론트는 선택된 플랫폼을 경로에 포함해 `POST /api/platforms/{platform}/token`을 호출한다. 백엔드는 먼저 `PlatformCredentialFacade`로 토큰을 검증하고, 검증 결과를 connection 모듈에 넘긴다.
 
-검증에 성공하면 백엔드는 PAT를 `PatCryptoService`로 암호화해서 `github_accounts`에 저장하고, 세션에 `currentUserId`를 넣는다. 이후 요청부터는 프론트가 PAT를 다시 보내지 않아도 세션과 저장된 암호화 토큰을 조합해 GitHub 연동을 수행한다.
+connection 모듈은 PAT를 암호화해 저장하고 세션에 `currentUserId`, `currentPlatform`을 저장한다. 이후 요청은 프론트가 PAT를 다시 보내지 않고 세션과 저장된 토큰으로 처리된다.
 
-### 5.2 저장소 목록 동기화
+### 6.2 저장소 동기화와 조회
 
-PAT 등록이 성공하면 프론트는 즉시 `refreshRepositories()`를 호출한다. 백엔드의 `RepositoryService.refreshRepositories(...)`는 세션으로 현재 사용자를 확인하고, 저장된 PAT를 복호화한 뒤 GitHub `/user/repos`를 호출한다.
+저장소 목록은 `GET /api/platforms/{platform}/repositories`로 캐시를 조회한다. 최신 원격 상태가 필요하면 `POST /api/platforms/{platform}/repositories/refresh`를 호출한다.
 
-응답으로 받은 저장소 목록은 `repository_caches`에 upsert 된다. 이후 저장소 목록 화면은 GitHub를 매번 직접 조회하지 않고 `GET /api/repositories`로 캐시된 저장소 목록을 읽는다.
+새로고침 시 repository 모듈은 platform 모듈에서 접근 가능한 저장소 목록을 받아 `repository_caches`에 upsert한다. 조회 시에는 현재 연결 계정의 `ownerKey`와 일치하는 저장소만 반환한다.
 
-### 5.3 저장소 선택 후 이슈 목록 조회
+### 6.3 이슈 동기화와 조회
 
-사용자가 저장소를 선택하면 이슈 목록 화면으로 이동한다. 이 화면은 먼저 저장소 메타데이터를 조회하고, 이어서 `GET /api/repositories/{repositoryId}/issues`로 캐시된 이슈 목록을 읽는다.
+이슈 목록은 `GET /api/platforms/{platform}/repositories/{repositoryId}/issues`로 캐시를 조회한다. `keyword`, `state` 쿼리로 캐시 결과를 필터링할 수 있다.
 
-최신 GitHub 상태가 필요하면 사용자가 `이슈 새로고침`을 누른다. 그러면 `IssueService.refreshIssues(...)`가 GitHub `/repos/{owner}/{repo}/issues`를 호출하고, 응답을 `issue_caches`에 반영한 뒤 다시 캐시 기반 목록을 반환한다.
+새로고침은 `POST /api/platforms/{platform}/repositories/{repositoryId}/issues/refresh`가 담당한다. issue 모듈은 저장소 접근 권한을 확인한 뒤 platform 모듈을 통해 원격 이슈 목록을 조회하고 `issue_caches`에 반영한다.
 
-### 5.4 이슈 상세와 댓글 조회
+### 6.4 이슈 생성, 수정, 닫기
 
-이슈 상세 화면은 `GET /issues/{issueNumber}`로 이슈 본문과 상태를 읽고, `GET /comments`로 캐시된 댓글을 읽는다.
+이슈 생성은 원격 플랫폼에 먼저 반영한 뒤 생성 결과를 캐시에 저장한다. 수정은 요청에 없는 필드를 현재 캐시 값으로 보완한 뒤 원격 수정 API를 호출한다.
 
-댓글도 저장소와 같은 패턴을 따른다. 사용자가 `댓글 새로고침`을 누르면 `CommentService.refreshComments(...)`가 GitHub 댓글 API를 호출하고, 결과를 `comment_caches`에 반영한 뒤 목록을 다시 보여준다.
+이슈 닫기는 `DELETE` API로 노출되어 있지만 실제 삭제가 아니다. 내부적으로 원격 이슈 상태를 `CLOSED`로 변경하고 이슈 목록을 다시 새로고침한다.
 
-### 5.5 이슈 생성
+### 6.5 댓글 동기화와 작성
 
-사용자가 새 이슈를 작성하면 프론트는 `POST /api/repositories/{repositoryId}/issues`를 호출한다. `IssueService.createIssue(...)`는 GitHub 이슈 생성 API를 호출하고, 생성된 결과를 즉시 `issue_caches`에 반영한다.
+댓글 목록은 `GET /api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}/comments`로 캐시를 조회한다. 원격 댓글을 다시 맞추려면 `/comments/refresh`를 호출한다.
 
-프론트는 성공 후 이슈 목록/상세 쿼리를 무효화하거나 상세 화면으로 이동하면서 새로 만들어진 이슈를 바로 보게 된다.
+댓글 작성은 원격 플랫폼에 먼저 작성한 뒤 생성된 댓글을 `comment_caches`에 저장한다. 댓글 수정/삭제는 현재 구현 범위에 없다.
 
-### 5.6 이슈 상태 변경과 닫기
+### 6.6 연결 종료
 
-이슈 상세 화면에서 상태를 바꾸거나 목록/상세에서 이슈를 닫으면 백엔드는 GitHub issue update API를 호출한다. 이후 수정된 결과를 `issue_caches`에 반영하거나, 닫기 동작의 경우 저장소 이슈 목록을 다시 동기화한다.
+`DELETE /api/platforms/{platform}/token`은 저장된 토큰을 제거하고 현재 세션 플랫폼이면 세션 연결 정보를 제거한다. `POST /api/auth/logout`은 세션 자체를 무효화한다.
 
-즉 현재 구현은 삭제가 아니라 GitHub 이슈를 `CLOSED` 상태로 변경하는 방식이다.
+## 7. 구현 기준 API 순서
 
-### 5.7 댓글 작성
+1. `POST /api/platforms/{platform}/token`
+2. `GET /api/platforms/{platform}/token/status`
+3. `GET /api/me`
+4. `POST /api/platforms/{platform}/repositories/refresh`
+5. `GET /api/platforms/{platform}/repositories`
+6. `GET /api/platforms/{platform}/repositories/{repositoryId}`
+7. `POST /api/platforms/{platform}/repositories/{repositoryId}/issues/refresh`
+8. `GET /api/platforms/{platform}/repositories/{repositoryId}/issues`
+9. `POST /api/platforms/{platform}/repositories/{repositoryId}/issues`
+10. `GET /api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}`
+11. `PATCH /api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}`
+12. `DELETE /api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}`
+13. `POST /api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}/comments/refresh`
+14. `GET /api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}/comments`
+15. `POST /api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}/comments`
+16. `DELETE /api/platforms/{platform}/token`
+17. `POST /api/auth/logout`
 
-댓글 작성은 `POST /api/repositories/{repositoryId}/issues/{issueNumber}/comments`로 들어간다. `CommentService.createComment(...)`가 GitHub 댓글 생성 API를 호출하고, 생성된 댓글을 `comment_caches`에 반영한다.
+## 8. 코드 추적 기준
 
-## 7. 이 흐름의 핵심 설계 포인트
+- 인증 컨트롤러: `backend/app/src/main/java/com/jw/github_issue_manager/controller/AuthController.java`
+- 저장소 컨트롤러: `backend/app/src/main/java/com/jw/github_issue_manager/controller/RepositoryController.java`
+- 이슈 컨트롤러: `backend/app/src/main/java/com/jw/github_issue_manager/controller/IssueController.java`
+- 댓글 컨트롤러: `backend/app/src/main/java/com/jw/github_issue_manager/controller/CommentController.java`
+- 연결 서비스: `backend/connection/src/main/java/com/jw/github_issue_manager/connection/internal/service/AuthService.java`
+- 저장소 서비스: `backend/repository/src/main/java/com/jw/github_issue_manager/repository/internal/service/RepositoryService.java`
+- 이슈 서비스: `backend/issue/src/main/java/com/jw/github_issue_manager/issue/internal/service/IssueService.java`
+- 댓글 서비스: `backend/comment/src/main/java/com/jw/github_issue_manager/comment/internal/service/CommentService.java`
+- 플랫폼 facade: `backend/platform/src/main/java/com/jw/github_issue_manager/platform/api`
+- 통합 테스트: `backend/app/src/test/java/com/jw/github_issue_manager/controller/ApiFlowIntegrationTest.java`
 
-- 인증의 기준은 세션이다. PAT는 최초 등록 시점에만 프론트에서 전달된다.
-- 조회의 기준은 캐시다. 저장소, 이슈, 댓글 조회 API는 기본적으로 로컬 캐시를 반환한다.
-- 최신화의 기준은 수동 동기화다. `refresh` 계열 API가 GitHub와 캐시를 다시 맞춘다.
-- 쓰기의 기준은 GitHub 원본이다. 이슈 생성, 수정, 댓글 생성은 먼저 GitHub에 반영한 뒤 캐시에 반영한다.
-- 접근 제어의 기준은 현재 로그인 사용자다. 백엔드는 세션 사용자와 저장소 owner 정보를 대조해 접근 가능한 리소스만 노출한다.
+## 9. 정리
 
-## 8. 코드 추적 포인트
+현재 메인 흐름은 "플랫폼 토큰 등록 + 세션 연결 + 캐시 기반 조회 + 수동 원격 동기화 + 원격 우선 변경 반영" 구조다.
 
-### 프론트엔드
-
-- PAT 화면: `frontend/src/pages/settings/GitHubTokenPage.tsx`
-- PAT 등록/해제: `frontend/src/widgets/github-token/GitHubTokenForm.tsx`
-- 저장소 화면: `frontend/src/pages/repositories/RepositoryListPage.tsx`
-- 저장소 목록/자동 새로고침: `frontend/src/widgets/repository-list/RepositoryListWidget.tsx`
-- 이슈 목록 화면: `frontend/src/pages/issues/IssueListPage.tsx`
-- 이슈 목록 액션: `frontend/src/widgets/issue-list/IssueListWidget.tsx`
-- 이슈 상세 화면: `frontend/src/pages/issues/IssueDetailPage.tsx`
-- 이슈 상세 표시: `frontend/src/widgets/issue-detail/IssueDetailSection.tsx`
-
-### 백엔드
-
-- 인증 API: `backend/src/main/java/com/jw/github_issue_manager/controller/AuthController.java`
-- 저장소 API: `backend/src/main/java/com/jw/github_issue_manager/controller/RepositoryController.java`
-- 이슈 API: `backend/src/main/java/com/jw/github_issue_manager/controller/IssueController.java`
-- 댓글 API: `backend/src/main/java/com/jw/github_issue_manager/controller/CommentController.java`
-- 인증 서비스: `backend/src/main/java/com/jw/github_issue_manager/service/AuthService.java`
-- 저장소 서비스: `backend/src/main/java/com/jw/github_issue_manager/service/RepositoryService.java`
-- 이슈 서비스: `backend/src/main/java/com/jw/github_issue_manager/service/IssueService.java`
-- 댓글 서비스: `backend/src/main/java/com/jw/github_issue_manager/service/CommentService.java`
-- GitHub API 클라이언트: `backend/src/main/java/com/jw/github_issue_manager/github/DefaultGitHubApiClient.java`
-
-## 9. 대표 API 시퀀스
-
-메인 유스케이스를 가장 짧게 따라가면 아래 호출 순서가 된다.
-
-1. `POST /api/github/token`
-2. `GET /api/github/token/status`
-3. `POST /api/repositories/refresh`
-4. `GET /api/repositories`
-5. `POST /api/repositories/{repositoryId}/issues/refresh`
-6. `GET /api/repositories/{repositoryId}/issues`
-7. `POST /api/repositories/{repositoryId}/issues`
-8. `GET /api/repositories/{repositoryId}/issues/{issueNumber}`
-9. `POST /api/repositories/{repositoryId}/issues/{issueNumber}/comments/refresh`
-10. `POST /api/repositories/{repositoryId}/issues/{issueNumber}/comments`
-11. `PATCH /api/repositories/{repositoryId}/issues/{issueNumber}`
-12. `DELETE /api/github/token`
-
-## 10. 테스트 기준의 검증 포인트
-
-현재 이 전체 흐름은 `backend/src/test/java/com/jw/github_issue_manager/controller/ApiFlowIntegrationTest.java`에 통합 시나리오 형태로 정리되어 있다.
-
-이 테스트는 아래 순서를 실제로 검증한다.
-
-- PAT 등록
-- 토큰 상태 조회
-- 현재 사용자 조회
-- 저장소 새로고침
-- 저장소 상세 조회
-- 이슈 새로고침
-- 이슈 생성
-- 이슈 목록 조회
-- 이슈 상태 변경
-- 댓글 새로고침
-- 댓글 생성
-- 이슈 sync-state 조회
-- 토큰 연결 해제
-
-## 11. 정리
-
-현재 GitHub Issue Manager의 메인 유스케이스는 "PAT 기반 GitHub 연동 + 캐시 기반 조회 + 필요 시 GitHub 재동기화" 구조로 이해하면 가장 정확하다.
-
-즉 사용자는 앱 안에서 빠르게 캐시 데이터를 탐색하고, 중요한 쓰기 동작은 GitHub 원본에 반영한 뒤 그 결과를 다시 앱 캐시에 반영하는 방식으로 시스템이 동작한다.
+문서 기준에서는 GitHub 전용 API 경로보다 플랫폼 공통 경로를 우선 사용한다. GitHub는 기본 플랫폼이고, 플랫폼별 차이는 platform gateway 내부 구현으로 격리한다.
