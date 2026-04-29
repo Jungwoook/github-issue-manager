@@ -14,6 +14,9 @@ import com.jw.github_issue_manager.connection.api.PlatformConnectionFacade;
 import com.jw.github_issue_manager.connection.api.dto.MeResponse;
 import com.jw.github_issue_manager.connection.api.dto.PlatformTokenStatusResponse;
 import com.jw.github_issue_manager.connection.api.dto.RegisterPlatformTokenRequest;
+import com.jw.github_issue_manager.connection.api.dto.RegisterValidatedPlatformTokenCommand;
+import com.jw.github_issue_manager.platform.api.PlatformCredentialFacade;
+import com.jw.github_issue_manager.platform.api.dto.PlatformCredentialValidationResult;
 
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -23,9 +26,14 @@ import jakarta.validation.Valid;
 public class AuthController {
 
     private final PlatformConnectionFacade platformConnectionFacade;
+    private final PlatformCredentialFacade platformCredentialFacade;
 
-    public AuthController(PlatformConnectionFacade platformConnectionFacade) {
+    public AuthController(
+        PlatformConnectionFacade platformConnectionFacade,
+        PlatformCredentialFacade platformCredentialFacade
+    ) {
         this.platformConnectionFacade = platformConnectionFacade;
+        this.platformCredentialFacade = platformCredentialFacade;
     }
 
     @PostMapping("/platforms/{platform}/token")
@@ -34,7 +42,22 @@ public class AuthController {
         @Valid @RequestBody RegisterPlatformTokenRequest request,
         HttpSession session
     ) {
-        return ResponseEntity.ok(platformConnectionFacade.registerPlatformToken(PlatformType.from(platform), request, session));
+        PlatformType platformType = PlatformType.from(platform);
+        PlatformCredentialValidationResult validation = platformCredentialFacade.validateCredential(
+            platformType,
+            request.accessToken(),
+            request.baseUrl()
+        );
+        RegisterValidatedPlatformTokenCommand command = new RegisterValidatedPlatformTokenCommand(
+            request.accessToken(),
+            validation.baseUrl(),
+            validation.externalUserId(),
+            validation.login(),
+            validation.displayName(),
+            validation.email(),
+            validation.avatarUrl()
+        );
+        return ResponseEntity.ok(platformConnectionFacade.registerPlatformToken(platformType, command, session));
     }
 
     @GetMapping("/platforms/{platform}/token/status")

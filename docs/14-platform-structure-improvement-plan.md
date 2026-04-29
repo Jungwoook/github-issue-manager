@@ -92,9 +92,9 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     participant C as RepositoryController
-    participant Repo as repository.api
-    participant Plat as platform.api
-    participant Conn as connection.api
+    participant Repo as repository
+    participant Plat as platform
+    participant Conn as connection
     participant DB as repository DB
 
     C->>Repo: RefreshRepositoriesCommand
@@ -109,15 +109,16 @@ sequenceDiagram
 - repository: 저장소 캐시와 refresh 유스케이스만 소유
 - platform: token access 조회와 GitHub/GitLab 원격 호출 소유
 - connection: token 원문과 암호화 저장 방식 소유
+- 모듈 간 호출은 각 모듈의 `*.api` 공개 계약을 통해 수행
 
 ### 5.2 이슈 / 댓글 변경
 
 ```mermaid
 sequenceDiagram
-    participant UseCase as issue/comment.api
-    participant Parent as repository/issue.api
-    participant Plat as platform.api
-    participant Conn as connection.api
+    participant UseCase as issue/comment
+    participant Parent as repository/issue
+    participant Plat as platform
+    participant Conn as connection
     participant DB as module DB
 
     UseCase->>Parent: parent access 확인
@@ -131,60 +132,94 @@ sequenceDiagram
 - issue: repository 존재와 접근 가능 여부만 확인
 - comment: issue 존재와 접근 가능 여부만 확인
 - issue/comment: token/baseUrl 조회 방식은 모름
+- 모듈 간 호출은 각 모듈의 `*.api` 공개 계약을 통해 수행
 
-## 6. PAT 등록 흐름 선택지
+## 6. PAT 등록 흐름 기준
 
 `platform -> connection`을 원칙으로 잡으면 PAT 등록 시 token 검증 흐름에서 순환 의존을 주의해야 한다.
 
-### 선택지 A: app 조립 방식
+현재 구현은 `app -> connection -> platform`에 가깝다. connection 등록 내부에서 platform 검증을 수행하므로, 일반 원격 호출을 `platform -> connection`으로 바꾸면 양방향 의존 위험이 생긴다.
 
-- 흐름: app -> platform token 검증, app -> connection 저장
-- 장점: connection -> platform 의존 제거
-- 단점: app이 등록 절차를 두 단계로 조립
-- 판단: 순환 의존 방지에는 가장 단순
+따라서 1차 개선안은 app 조립 방식을 기준으로 한다.
 
-### 선택지 B: connection 등록 내부에서 platform 검증
+```mermaid
+sequenceDiagram
+    participant App as app
+    participant Plat as platform
+    participant Conn as connection
+    participant DB as connection DB
+
+    App->>Plat: validateCredential(platform, token, baseUrl)
+    Plat-->>App: remote user profile
+    App->>Conn: registerConnection(validated profile, token, baseUrl)
+    Conn->>DB: encrypted token 저장
+    Conn-->>App: connection status
+```
+
+- 기준: app -> platform token 검증
+- 기준: app -> connection 저장
+- 기준: connection -> platform 직접 의존 제거
+- 기준: 일반 원격 호출은 platform -> connection 유지
+- 이유: 순환 의존을 만들지 않고 token 검증과 저장 책임을 분리
+
+### 보류한 대안
+
+#### connection 등록 내부에서 platform 검증
 
 - 흐름: app -> connection, connection -> platform 검증
 - 장점: 등록 유스케이스가 connection에 모임
 - 단점: 평상시 원격 호출은 platform -> connection이므로 순환 의존이 생김
 - 판단: Gradle 모듈 기준으로는 피하는 편이 안전
 
-### 선택지 C: verification port 분리
+#### verification port 분리
 
 - 흐름: connection -> token-verifier port, platform adapter가 구현
 - 장점: 등록 유스케이스를 connection에 유지 가능
 - 단점: 포트/어댑터가 늘어나고 초기 구조가 복잡해짐
 - 판단: 등록 정책이 복잡해질 때 검토
 
-1차 개선안은 선택지 A를 기준으로 한다.
+## 7. 전환 계획
 
-## 7. 전환 순서 제안
+전환은 기존 GitHub 흐름을 유지하면서 의존 방향만 단계적으로 바꾼다. 준비성 작업은 각 단계에 포함하고, 테스트 가능한 중간 상태를 남긴다.
 
-1. 문서 정리
-   - 13번은 현재 전환 기준으로 유지
-   - 14번에서 개선 목표와 후속 전환 순서 관리
+### 7.1 1단계: PAT 등록 흐름 재배치
 
-2. platform remote API 재정의
-   - remote command에 `connectionId` 또는 connection reference 전달
-   - token/baseUrl 파라미터를 업무 모듈 API에서 제거
+- 대상: app, platform, connection
+- 작업: platform에 token/baseUrl 검증용 public API 추가
+- 작업: AuthController가 platform 검증 후 connection 저장을 호출
+- 작업: connection register command는 검증된 remote user profile을 입력으로 받음
+- 작업: connection 내부의 platformGatewayResolver 의존 제거
+- 유지: 응답 DTO와 프론트 API 계약은 변경하지 않음
+- 검증: PAT 등록, 상태 조회, logout 흐름 회귀 테스트
 
-3. platform 내부 credential 조회 추가
-   - platform application service가 `connection.api`로 token access 조회
-   - GitHub/GitLab adapter에는 검증된 credential만 전달
+### 7.2 2단계: 원격 호출 경계 재정의
 
-4. 업무 모듈의 connection 의존 제거
-   - repository / issue / comment에서 `connection.api` 직접 호출 제거
-   - Gradle 의존성에서 connection 제거
+- 대상: platform, repository, issue, comment
+- 작업: remote 호출 command에 token/baseUrl 대신 connection reference 전달
+- 작업: platform application service가 connection.api로 token access 조회
+- 작업: repository / issue / comment의 PlatformConnectionFacade 직접 호출 제거
+- 작업: GitHub/GitLab adapter에는 검증된 credential만 전달
+- 유지: parent access 확인은 repository.api, issue.api 기준으로 유지
+- 검증: 저장소 refresh, 이슈 생성/수정, 댓글 작성 테스트
 
-5. PAT 등록 흐름 정리
-   - app 조립 방식 또는 verification port 방식 중 하나로 확정
-   - connection -> platform 직접 의존 제거 여부 결정
+### 7.3 3단계: Gradle 의존성과 경계 테스트 정리
 
-6. 모듈 경계 테스트 갱신
-   - repository / issue / comment -> connection 금지
-   - platform -> connection 허용
-   - GitHub/GitLab adapter 외부 참조 금지 유지
+- 대상: Gradle, app test
+- 작업: repository / issue / comment -> connection Gradle 의존 제거
+- 작업: platform -> connection 허용 규칙 추가
+- 작업: connection -> platform 금지 규칙 추가
+- 작업: repository / issue / comment -> connection 금지 규칙 추가
+- 작업: GitHub/GitLab adapter 외부 참조 금지 규칙 유지
+- 검증: 전체 backend test
+
+### 7.4 4단계: 문서와 적용 상태 정리
+
+- 대상: docs
+- 작업: 13번은 기존 전환 이력으로 유지
+- 작업: 14번에 실제 적용 단계와 남은 작업 기록
+- 작업: 전환 완료 후 각 모듈과 서비스 구조를 설명하는 문서 작성
+- 작업: 작업 기록은 날짜별 `docs/task/YYYYMMDD.md`에 추가
+- 검증: 코드 의존성, 문서 그래프, 테스트 규칙이 같은 방향을 설명하는지 확인
 
 ## 8. 검증 기준
 
@@ -192,10 +227,22 @@ sequenceDiagram
 - repository / issue / comment 코드에서 token, baseUrl, encrypted token 타입이 사라진다.
 - platform 모듈만 GitHub/GitLab adapter와 connection token access를 함께 안다.
 - connection 모듈은 GitHub/GitLab repository, issue, comment API를 모른다.
+- connection 모듈은 platform 모듈에 의존하지 않는다.
 - 기존 GitHub 저장소 refresh, 이슈 생성/수정, 댓글 작성 흐름은 동일하게 동작한다.
 
 ## 9. 보류 사항
 
-- PAT 등록 token 검증을 app 조립으로 둘지, verification port로 분리할지 확정 필요
-- `connectionId`를 platform remote command에 직접 노출할지, 공통 reference 타입으로 감쌀지 결정 필요
-- 현재 Gradle 의존성과 코드 구조가 13번 기준으로 이미 진행된 상태이므로 실제 변경은 별도 단계로 작게 나누어야 함
+- 원격 호출 command를 세션 기반에서 `connectionId` 또는 공통 connection reference 기반으로 바꿀지 후속 검토
+- `PlatformType`의 패키지명을 장기적으로 shared-kernel 성격에 맞게 정리할지 후속 검토
+
+## 10. 적용 상태
+
+- 적용: PAT 등록 흐름을 app 조립 방식으로 전환
+- 적용: platform credential 검증 API 추가
+- 적용: connection 등록 API는 검증된 remote user profile과 token 저장만 담당하도록 축소
+- 적용: 원격 호출 token/baseUrl 조회를 platform 내부로 이동
+- 적용: repository / issue / comment의 connection 직접 의존 제거
+- 적용: platform -> connection, connection -> shared-kernel 방향으로 Gradle 의존성 정리
+- 적용: 모듈 경계 테스트에 업무 모듈 -> connection 금지, connection -> platform 금지 규칙 추가
+- 검증: `.\gradlew.bat test`
+- 후속: 세션 기반 remote command를 명시적 connection reference로 바꿀지 검토

@@ -5,7 +5,6 @@ plugins {
 dependencies {
 	api project(':platform')
 
-	implementation project(':connection')
 	implementation project(':issue')
 	implementation project(':repository')
 	implementation project(':shared-kernel')

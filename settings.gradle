@@ -1,0 +1,3 @@
+rootProject.name = 'github-issue-manager-root'
+
+includeBuild 'backend'
