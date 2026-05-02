@@ -17,15 +17,15 @@
 - 플랫폼 API: GitHub 또는 GitLab API
 - 로컬 캐시: 저장소, 이슈, 댓글, 동기화 상태 저장소
 
-## 3. 구현 기준 수정 사항
+## 3. 구현 기준
 
-- 기존 `/api/github/token` 경로는 현재 `/api/platforms/{platform}/token`으로 변경됨
-- 기존 `/api/repositories...` 경로는 현재 `/api/platforms/{platform}/repositories...`로 변경됨
-- `githubRepositoryId`, `githubIssueId` 중심 표현은 `platform + repositoryId/issueId/numberOrKey` 표현으로 정리함
-- 인증 검증은 컨트롤러에서 `PlatformCredentialFacade`가 수행하고, 저장은 connection 모듈이 담당함
+- 플랫폼 연결 API는 `/api/platforms/{platform}/token` 경로를 사용함
+- 저장소/이슈/댓글 API는 `/api/platforms/{platform}/repositories...` 경로를 사용함
+- 외부 리소스는 `platform + repositoryId/issueId/numberOrKey` 표현으로 다룸
+- 인증 검증은 `PlatformCredentialFacade`가 수행하고, 저장은 connection 모듈이 담당함
 - 저장소/이슈/댓글 기능은 각 모듈 facade를 통해 접근함
 - 삭제 API는 실제 삭제가 아니라 이슈 상태를 `CLOSED`로 변경하는 닫기 처리임
-- 라벨 API는 프론트 호출 코드가 남아 있지만 현재 백엔드 컨트롤러 구현 범위에는 포함하지 않음
+- 라벨 API는 현재 백엔드 컨트롤러 구현 범위에 포함하지 않음
 
 ## 4. 유스케이스 목록
 
