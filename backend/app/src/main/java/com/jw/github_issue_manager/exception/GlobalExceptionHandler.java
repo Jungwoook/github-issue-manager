@@ -12,18 +12,30 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.RestClientResponseException;
 
+import com.jw.github_issue_manager.comment.api.CommentNotFoundException;
 import com.jw.github_issue_manager.github.GitHubApiException;
 import com.jw.github_issue_manager.gitlab.GitLabApiException;
+import com.jw.github_issue_manager.issue.api.IssueNotFoundException;
+import com.jw.github_issue_manager.repository.api.RepositoryNotFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final String PLATFORM_API_ERROR = "PLATFORM_API_ERROR";
 
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException exception) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-            .body(ErrorResponse.of(exception.getCode(), exception.getMessage()));
+    @ExceptionHandler(RepositoryNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleRepositoryNotFound(RepositoryNotFoundException exception) {
+        return notFound(exception.getCode(), exception.getMessage());
+    }
+
+    @ExceptionHandler(IssueNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleIssueNotFound(IssueNotFoundException exception) {
+        return notFound(exception.getCode(), exception.getMessage());
+    }
+
+    @ExceptionHandler(CommentNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleCommentNotFound(CommentNotFoundException exception) {
+        return notFound(exception.getCode(), exception.getMessage());
     }
 
     @ExceptionHandler(UnauthorizedException.class)
@@ -84,5 +96,10 @@ public class GlobalExceptionHandler {
 
     private ErrorResponse.FieldErrorDetail toFieldErrorDetail(FieldError fieldError) {
         return new ErrorResponse.FieldErrorDetail(fieldError.getField(), fieldError.getDefaultMessage());
+    }
+
+    private ResponseEntity<ErrorResponse> notFound(String code, String message) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            .body(ErrorResponse.of(code, message));
     }
 }

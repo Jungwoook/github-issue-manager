@@ -8,10 +8,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.core.remote.RemoteRepository;
-import com.jw.github_issue_manager.repository.internal.domain.RepositoryCache;
-import com.jw.github_issue_manager.repository.api.dto.RepositoryResponse;
-import com.jw.github_issue_manager.exception.ResourceNotFoundException;
 import com.jw.github_issue_manager.repository.api.RepositoryAccess;
+import com.jw.github_issue_manager.repository.api.RepositoryNotFoundException;
+import com.jw.github_issue_manager.repository.api.dto.RepositoryResponse;
+import com.jw.github_issue_manager.repository.internal.domain.RepositoryCache;
 import com.jw.github_issue_manager.repository.internal.repository.RepositoryCacheRepository;
 
 @Service
@@ -49,10 +49,10 @@ public class RepositoryService {
 
     private RepositoryCache requireAccessibleRepositoryCache(PlatformType platform, String repositoryId, String accountLogin) {
         RepositoryCache repository = repositoryCacheRepository.findByPlatformAndExternalId(platform, repositoryId)
-            .orElseThrow(() -> new ResourceNotFoundException("REPOSITORY_NOT_FOUND", "Repository was not found."));
+            .orElseThrow(RepositoryNotFoundException::new);
 
         if (!repository.getOwnerKey().equals(accountLogin)) {
-            throw new ResourceNotFoundException("REPOSITORY_NOT_FOUND", "Repository was not found.");
+            throw new RepositoryNotFoundException();
         }
 
         return repository;

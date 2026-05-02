@@ -159,6 +159,24 @@ class ModuleBoundaryTest {
         }
     }
 
+    @Test
+    void sharedKernelContainsOnlyPlatformType() throws IOException {
+        Path sourceRoot = backendRoot().resolve("shared-kernel/src/main/java");
+        try (Stream<Path> sourceFiles = Files.walk(sourceRoot)) {
+            Set<String> actualSourceFiles = sourceFiles
+                .filter(path -> path.toString().endsWith(".java"))
+                .map(sourceRoot::relativize)
+                .map(path -> path.toString().replace('\\', '/'))
+                .collect(java.util.stream.Collectors.toCollection(java.util.TreeSet::new));
+
+            assertEquals(
+                Set.of("com/jw/github_issue_manager/core/platform/PlatformType.java"),
+                actualSourceFiles,
+                "shared-kernel must stay limited to stable cross-module primitives."
+            );
+        }
+    }
+
     private Set<String> projectDependencies(String moduleName) throws IOException {
         String buildGradle = Files.readString(backendRoot().resolve(moduleName).resolve("build.gradle"));
         Matcher matcher = PROJECT_DEPENDENCY.matcher(buildGradle);

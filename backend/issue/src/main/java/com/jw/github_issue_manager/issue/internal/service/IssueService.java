@@ -7,11 +7,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.core.remote.RemoteIssue;
-import com.jw.github_issue_manager.issue.internal.domain.IssueCache;
+import com.jw.github_issue_manager.issue.api.IssueAccess;
+import com.jw.github_issue_manager.issue.api.IssueNotFoundException;
 import com.jw.github_issue_manager.issue.api.dto.IssueDetailResponse;
 import com.jw.github_issue_manager.issue.api.dto.IssueSummaryResponse;
-import com.jw.github_issue_manager.exception.ResourceNotFoundException;
-import com.jw.github_issue_manager.issue.api.IssueAccess;
+import com.jw.github_issue_manager.issue.internal.domain.IssueCache;
 import com.jw.github_issue_manager.issue.internal.repository.IssueCacheRepository;
 
 @Service
@@ -60,7 +60,7 @@ public class IssueService {
 
     private IssueCache requireIssueCache(PlatformType platform, String repositoryId, String issueNumberOrKey) {
         return issueCacheRepository.findByPlatformAndRepositoryExternalIdAndNumberOrKey(platform, repositoryId, issueNumberOrKey)
-            .orElseThrow(() -> new ResourceNotFoundException("ISSUE_NOT_FOUND", "Issue was not found."));
+            .orElseThrow(IssueNotFoundException::new);
     }
 
     private IssueCache upsertIssueCache(PlatformType platform, String repositoryId, RemoteIssue issueInfo) {
