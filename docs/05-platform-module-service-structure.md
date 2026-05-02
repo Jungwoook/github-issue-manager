@@ -1,143 +1,165 @@
-# Platform Module Service Structure
+# Module Service Structure
 
 ## Summary
 
-- 목적: platform/connection 중심 구조 전환 이후 각 모듈과 서비스 책임을 정리한다.
-- 기준: 원격 API 호출은 `platform`이 소유하고, credential 저장과 token access는 `connection`이 소유한다.
-- 원칙: repository / issue / comment는 token, baseUrl, 암호화 저장 방식을 모른다.
-- 검증: 모듈 경계 테스트가 Gradle 의존성과 금지 import를 함께 확인한다.
+- 목적: 13번 아키텍처 개선 적용 이후의 현재 모듈 책임과 의존 방향을 정리한다.
+- 기준: HTTP 조립은 `app`, use case orchestration은 `application`, 원격 adapter는 `platform`이 담당한다.
+- 원칙: repository / issue / comment는 token, baseUrl, 원격 API client, 다른 업무 모듈을 직접 알지 않는다.
+- 검증: `ModuleBoundaryTest`가 Gradle 의존성, public API import, shared-kernel 축소 기준을 확인한다.
 
 ## 1. 전체 의존 방향
 
 ```mermaid
 flowchart TD
     App["app"]
+    Application["application"]
     Platform["platform"]
     Connection["connection"]
     Repository["repository"]
     Issue["issue"]
     Comment["comment"]
-    Shared["shared-kernel"]
+    Shared["shared-kernel\nPlatformType only"]
 
-    App --> Platform
-    App --> Connection
-    App --> Repository
-    App --> Issue
-    App --> Comment
-    App --> Shared
+    App --> Application
 
-    Repository --> Platform
+    Application --> Platform
+    Application --> Connection
+    Application --> Repository
+    Application --> Issue
+    Application --> Comment
+    Application --> Shared
+
     Repository --> Shared
-    Issue --> Repository
-    Issue --> Platform
     Issue --> Shared
-    Comment --> Issue
-    Comment --> Repository
-    Comment --> Platform
     Comment --> Shared
-
-    Platform --> Connection
     Platform --> Shared
     Connection --> Shared
 ```
 
-- app: HTTP 조립, 등록 흐름 조립
-- platform: credential 검증, 원격 API 호출, adapter 선택
+- app: HTTP controller, exception handler, bootstrapping
+- application: token 조회, remote 호출, cache 반영, sync 기록의 유스케이스 조립
+- platform: credential 검증, gateway 선택, GitHub/GitLab API client, remote DTO mapping
 - connection: token 저장, 암호화, 현재 연결 조회, token access 제공
-- repository / issue / comment: 자기 cache와 업무 유스케이스 소유
-- shared-kernel: sync 상태, 공통 exception, 공통 response DTO
+- repository / issue / comment: 자기 cache와 cache 반영 public API 소유
+- shared-kernel: `PlatformType`만 소유
 
 ## 2. app
 
-- 주요 서비스: controller 계층
-- 역할: REST 요청을 각 모듈 public API로 연결
-- PAT 등록: platform 검증 후 connection 저장 호출
-- 금지: connection DB, platform adapter, 업무 모듈 internal 직접 접근
+- 주요 구성: controller 계층, `GlobalExceptionHandler`, bootstrapping
+- 역할: REST 요청을 application public API로 연결
+- PAT 등록: `AuthApplicationFacade` 호출
+- 저장소/이슈/댓글 흐름: 각 application facade 호출
+- 예외 처리: 모듈별 not found 예외를 HTTP 404로 변환
+- 금지: 업무 모듈 internal 직접 접근
+- 금지: platform gateway 또는 connection token access 직접 조립
 
-### PAT 등록 흐름
+## 3. application
+
+- 주요 구성: `AuthApplicationFacade`, `RepositoryApplicationFacade`, `IssueApplicationFacade`, `CommentApplicationFacade`
+- 역할: use case orchestration
+- 역할: connection에서 current connection/token/baseUrl 조회
+- 역할: platform gateway 호출
+- 역할: repository / issue / comment cache 반영 API 호출
+- 역할: `SyncStateService`로 sync 상태 기록과 조회
+- 소유: `SyncState`, `SyncResourceType`, `SyncStatus`, `SyncStateRepository`, `SyncStateResponse`
+- 설정: `ApplicationSyncConfig`가 sync entity/repository scan을 담당
+- 금지: GitHub/GitLab client 직접 구현
+- 금지: 업무 cache 저장 규칙을 직접 소유
+
+### 대표 저장소 새로고침 흐름
 
 ```mermaid
 sequenceDiagram
     participant App as app
-    participant Platform as platform
+    participant Application as application
     participant Connection as connection
+    participant Platform as platform
+    participant Repository as repository
 
-    App->>Platform: validateCredential(platform, token, baseUrl)
-    Platform-->>App: validation result
-    App->>Connection: registerPlatformToken(validated command)
-    Connection-->>App: MeResponse
+    App->>Application: refreshRepositories(platform, session)
+    Application->>Connection: requireTokenAccess(platform, session)
+    Connection-->>Application: token/baseUrl/accountLogin
+    Application->>Platform: getAccessibleRepositories(token, baseUrl)
+    Platform-->>Application: RemoteRepository list
+    Application->>Repository: upsertRepositories(platform, accountLogin, remote list)
+    Repository-->>Application: RepositoryResponse list
+    Application->>Application: sync state 기록
+    Application-->>App: RepositoryResponse list
 ```
 
-## 3. platform
+## 4. platform
 
-- 주요 서비스: `PlatformCredentialFacade`, `PlatformRemoteFacade`
+- 주요 구성: `PlatformCredentialFacade`, `PlatformGatewayResolver`, `PlatformGateway`
 - `PlatformCredentialFacade`: PAT/baseUrl 검증, remote user profile 조회, GitLab baseUrl 정규화
-- `PlatformRemoteFacade`: repository/issue/comment 원격 API 호출의 단일 관문
-- 내부 구성: `PlatformGatewayResolver`, GitHub/GitLab gateway
-- 사용 의존: connection token access, shared-kernel
-- 소유: `PlatformType`, remote DTO, gateway 계약
+- `PlatformGatewayResolver`: platform 값에 맞는 gateway 선택
+- `PlatformGateway`: repository/issue/comment 원격 API 호출 계약
+- 내부 구현: GitHub/GitLab client, gateway, response model, mapper
+- 입력: accessToken, baseUrl, remote 요청 값
+- 출력: `RemoteRepository`, `RemoteIssue`, `RemoteComment`, `RemoteUserProfile`
+- 금지: connection token repository 접근
+- 금지: session 접근
+- 금지: repository/issue/comment cache 접근
 
-### 원격 호출 흐름
-
-```mermaid
-sequenceDiagram
-    participant Module as repository/issue/comment
-    participant Platform as platform
-    participant Connection as connection
-    participant Remote as GitHub/GitLab
-
-    Module->>Platform: remote operation
-    Platform->>Connection: requireTokenAccess
-    Connection-->>Platform: token access
-    Platform->>Remote: API request
-    Remote-->>Platform: remote result
-    Platform-->>Module: remote result
-```
-
-## 4. connection
+## 5. connection
 
 - 주요 서비스: `PlatformConnectionFacade`, `AuthService`, `PatCryptoService`
 - `PlatformConnectionFacade`: 연결 등록, 상태 조회, logout, token access 공개 API
 - `AuthService`: 연결 저장/조회, 세션 기준 현재 연결 확인
 - `PatCryptoService`: token 암호화/복호화
+- 제공: `TokenAccess`, `CurrentConnection`
 - 금지: GitHub/GitLab adapter 호출
 - 금지: repository/issue/comment 캐시 직접 접근
 
-## 5. repository
+## 6. repository
 
 - 주요 서비스: `RepositoryFacade`, `RepositoryService`
-- 소유: repository cache, repository refresh, repository access 확인
-- 원격 호출: `PlatformRemoteFacade` 사용
-- 부모 확인: 없음
-- 금지: `PlatformConnectionFacade`, `TokenAccess`, platform gateway 직접 사용
+- 소유: `repository_caches`
+- 역할: 현재 계정 기준 저장소 목록 조회
+- 역할: 저장소 접근 가능 여부 확인
+- 역할: remote repository list를 cache에 반영
+- 예외: `RepositoryNotFoundException`
+- 금지: platform gateway 직접 호출
+- 금지: connection 직접 의존
+- 금지: issue/comment 직접 의존
 
-## 6. issue
+## 7. issue
 
 - 주요 서비스: `IssueFacade`, `IssueService`
-- 소유: issue cache, issue refresh, issue 생성/수정/닫기
-- 부모 확인: `RepositoryFacade`로 repository 접근 가능 여부 확인
-- 원격 호출: `PlatformRemoteFacade` 사용
-- 금지: connection 직접 의존, repository entity 직접 참조
+- 소유: `issue_caches`
+- 역할: 이슈 목록/상세 조회
+- 역할: 이슈 접근 가능 여부 확인
+- 역할: remote issue를 cache에 반영
+- 예외: `IssueNotFoundException`
+- 금지: platform gateway 직접 호출
+- 금지: connection 직접 의존
+- 금지: repository/comment 직접 의존
 
-## 7. comment
+## 8. comment
 
 - 주요 서비스: `CommentFacade`, `CommentService`
-- 소유: comment cache, comment refresh, comment 작성
-- 부모 확인: `IssueFacade`로 issue 접근 가능 여부 확인, 필요 시 `RepositoryFacade`로 repository 정보 확인
-- 원격 호출: `PlatformRemoteFacade` 사용
-- 금지: connection 직접 의존, issue entity 직접 참조
+- 소유: `comment_caches`
+- 역할: 댓글 목록 조회
+- 역할: remote comment를 cache에 반영
+- 예외: `CommentNotFoundException`
+- 금지: platform gateway 직접 호출
+- 금지: connection 직접 의존
+- 금지: repository/issue 직접 의존
 
-## 8. shared-kernel
+## 9. shared-kernel
 
-- 주요 서비스: `SyncStateService`
-- 소유: sync 상태, 공통 exception, 공통 response DTO
-- 제한: 업무 규칙과 외부 API DTO를 추가하지 않는다.
-- 참고: `PlatformType`은 현재 platform 모듈 소유이며 shared-kernel 소유가 아니다.
+- 소유: `PlatformType`
+- 이유: cache entity가 `platform + externalId` 식별자를 타입 안전하게 사용한다.
+- 금지: sync 상태 entity/service/repository
+- 금지: 공통 not found 예외
+- 금지: API 응답 DTO
+- 금지: 업무 규칙, 특정 플랫폼 정책, 편의 util 누적
 
-## 9. 검증 기준
+## 10. 검증 기준
 
+- app은 application public API만 호출한다.
+- application만 connection, platform, 업무 cache 모듈을 함께 조립한다.
 - repository / issue / comment는 connection 모듈에 Gradle 의존을 갖지 않는다.
-- connection은 platform 모듈에 Gradle 의존을 갖지 않는다.
-- platform만 connection token access와 GitHub/GitLab gateway를 함께 안다.
-- app은 각 모듈의 public API만 호출한다.
+- repository / issue / comment는 서로 직접 의존하지 않는다.
+- platform은 connection 모듈에 Gradle 의존을 갖지 않는다.
+- shared-kernel 소스는 `PlatformType.java`만 포함한다.
 - 전체 검증 명령: `.\gradlew.bat test`

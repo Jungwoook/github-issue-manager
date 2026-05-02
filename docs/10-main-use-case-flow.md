@@ -10,7 +10,8 @@
 - API는 `/api/platforms/{platform}/...` 경로를 사용한다.
 - 플랫폼별 원격 호출은 platform 모듈의 gateway 뒤로 숨겨져 있다.
 - connection 모듈은 세션과 암호화된 PAT를 관리한다.
-- repository, issue, comment 모듈은 로컬 캐시를 읽고 쓰며 필요한 시점에 platform 모듈을 호출한다.
+- application 모듈은 connection, platform, repository, issue, comment를 조립한다.
+- repository, issue, comment 모듈은 로컬 캐시를 읽고 쓰며 platform 모듈을 직접 호출하지 않는다.
 
 ## 2. 전체 흐름 요약
 
@@ -27,12 +28,13 @@
 
 - Frontend: React, React Query, platform-aware API client
 - App API: Spring MVC controller
+- Application: use case orchestration, remote 호출 조립, sync 상태 기록
 - Connection: 사용자, 플랫폼 연결, PAT 암호화, 세션 관리
 - Repository: 저장소 캐시, 저장소 접근 검증
 - Issue: 이슈 캐시, 이슈 조회/생성/수정/닫기
 - Comment: 댓글 캐시, 댓글 조회/작성
-- Platform: `PlatformCredentialFacade`, `PlatformRemoteFacade`, 플랫폼 gateway
-- Shared Kernel: 동기화 상태 기록과 조회
+- Platform: `PlatformCredentialFacade`, `PlatformGatewayResolver`, 플랫폼 gateway
+- Shared Kernel: `PlatformType`
 - External Platform: GitHub 또는 GitLab API
 
 ## 4. 전체 Flowchart
@@ -40,38 +42,39 @@
 ```mermaid
 flowchart TD
     A["사용자: 플랫폼 PAT 입력"] --> B["POST /api/platforms/{platform}/token"]
-    B --> C["PlatformCredentialFacade: 토큰 검증"]
-    C --> D["PlatformGateway: 원격 사용자 조회"]
-    D --> E["Connection: 사용자/연결 저장 + 세션 연결"]
-    E --> F["GET /api/me 또는 token/status"]
-    F --> G["POST /api/platforms/{platform}/repositories/refresh"]
-    G --> H["PlatformRemoteFacade: 원격 저장소 조회"]
-    H --> I["Repository: repository_caches upsert"]
-    I --> J["GET /api/platforms/{platform}/repositories"]
-    J --> K["사용자: 저장소 선택"]
-    K --> L["GET /api/platforms/{platform}/repositories/{repositoryId}"]
-    K --> M["POST /api/platforms/{platform}/repositories/{repositoryId}/issues/refresh"]
-    M --> N["PlatformRemoteFacade: 원격 이슈 조회"]
-    N --> O["Issue: issue_caches upsert"]
-    O --> P["GET /api/platforms/{platform}/repositories/{repositoryId}/issues"]
-    P --> Q["사용자: 이슈 상세 진입"]
-    Q --> R["GET /api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}"]
-    R --> S["GET /api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}/comments"]
-    Q --> T["POST comments/refresh"]
-    T --> U["PlatformRemoteFacade: 원격 댓글 조회"]
-    U --> V["Comment: comment_caches upsert"]
-    P --> W["POST issues: 이슈 생성"]
-    W --> X["PlatformRemoteFacade: 원격 이슈 생성"]
-    X --> O
-    R --> Y["PATCH issue: 이슈 수정"]
-    Y --> Z["PlatformRemoteFacade: 원격 이슈 수정"]
-    Z --> O
-    R --> AA["DELETE issue: 이슈 닫기"]
-    AA --> AB["PlatformRemoteFacade: 상태 CLOSED 변경"]
-    AB --> M
-    S --> AC["POST comments: 댓글 작성"]
-    AC --> AD["PlatformRemoteFacade: 원격 댓글 생성"]
-    AD --> V
+    B --> C["Application: 토큰 등록 조립"]
+    C --> D["PlatformCredentialFacade: 토큰 검증"]
+    D --> E["PlatformGateway: 원격 사용자 조회"]
+    E --> F["Connection: 사용자/연결 저장 + 세션 연결"]
+    F --> G["GET /api/me 또는 token/status"]
+    G --> H["POST /api/platforms/{platform}/repositories/refresh"]
+    H --> I["Application: token 조회 + 원격 저장소 조회"]
+    I --> J["Repository: repository_caches upsert"]
+    J --> K["GET /api/platforms/{platform}/repositories"]
+    K --> L["사용자: 저장소 선택"]
+    L --> M["GET /api/platforms/{platform}/repositories/{repositoryId}"]
+    L --> N["POST /api/platforms/{platform}/repositories/{repositoryId}/issues/refresh"]
+    N --> O["Application: 저장소 확인 + 원격 이슈 조회"]
+    O --> P["Issue: issue_caches upsert"]
+    P --> Q["GET /api/platforms/{platform}/repositories/{repositoryId}/issues"]
+    Q --> R["사용자: 이슈 상세 진입"]
+    R --> S["GET /api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}"]
+    S --> T["GET /api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}/comments"]
+    R --> U["POST comments/refresh"]
+    U --> V["Application: 이슈 확인 + 원격 댓글 조회"]
+    V --> W["Comment: comment_caches upsert"]
+    Q --> X["POST issues: 이슈 생성"]
+    X --> Y["Application: 원격 이슈 생성"]
+    Y --> P
+    S --> Z["PATCH issue: 이슈 수정"]
+    Z --> AA["Application: 원격 이슈 수정"]
+    AA --> P
+    S --> AB["DELETE issue: 이슈 닫기"]
+    AB --> AC["Application: 상태 CLOSED 변경 + 이슈 refresh"]
+    AC --> P
+    T --> AD["POST comments: 댓글 작성"]
+    AD --> AE["Application: 원격 댓글 생성"]
+    AE --> W
 ```
 
 ## 5. 전체 Sequence Diagram
@@ -81,6 +84,7 @@ sequenceDiagram
     actor U as User
     participant F as Frontend
     participant API as App API
+    participant AppSvc as Application
     participant Conn as Connection
     participant Repo as Repository
     participant Issue as Issue
@@ -91,59 +95,78 @@ sequenceDiagram
 
     U->>F: PAT 등록
     F->>API: POST /api/platforms/{platform}/token
-    API->>Platform: validateCredential(platform, token, baseUrl)
+    API->>AppSvc: registerPlatformToken(...)
+    AppSvc->>Platform: validateCredential(platform, token, baseUrl)
     Platform->>Remote: 현재 사용자 조회
     Remote-->>Platform: 사용자 프로필
-    API->>Conn: registerPlatformToken(...)
+    AppSvc->>Conn: registerPlatformToken(...)
     Conn->>DB: 사용자/연결 저장, PAT 암호화
-    Conn-->>API: MeResponse
+    Conn-->>AppSvc: MeResponse
+    AppSvc-->>API: MeResponse
     API-->>F: 현재 사용자 정보
 
     U->>F: 저장소 새로고침
     F->>API: POST /api/platforms/{platform}/repositories/refresh
-    API->>Repo: refreshRepositories(platform, session)
-    Repo->>Platform: getAccessibleRepositories(platform, session)
+    API->>AppSvc: refreshRepositories(platform, session)
+    AppSvc->>Conn: requireTokenAccess(platform, session)
+    Conn-->>AppSvc: token/baseUrl/accountLogin
+    AppSvc->>Platform: getAccessibleRepositories(token, baseUrl)
     Platform->>Remote: 저장소 목록 조회
     Remote-->>Platform: 원격 저장소 목록
-    Repo->>DB: repository_caches upsert, sync-state 기록
-    Repo-->>API: 저장소 목록
+    Platform-->>AppSvc: RemoteRepository 목록
+    AppSvc->>Repo: upsertRepositories(...)
+    Repo->>DB: repository_caches upsert
+    AppSvc->>DB: sync-state 기록
+    Repo-->>AppSvc: 저장소 목록
+    AppSvc-->>API: 저장소 목록
     API-->>F: 저장소 목록
 
     U->>F: 저장소 선택
     F->>API: POST /api/platforms/{platform}/repositories/{repositoryId}/issues/refresh
-    API->>Issue: refreshIssues(platform, repositoryId, session)
-    Issue->>Repo: requireAccessibleRepository(...)
-    Issue->>Platform: getRepositoryIssues(...)
+    API->>AppSvc: refreshIssues(platform, repositoryId, session)
+    AppSvc->>Repo: requireAccessibleRepository(...)
+    AppSvc->>Conn: requireTokenAccess(platform, session)
+    AppSvc->>Platform: getRepositoryIssues(...)
     Platform->>Remote: 이슈 목록 조회
     Remote-->>Platform: 원격 이슈 목록
-    Issue->>DB: issue_caches upsert, sync-state 기록
-    Issue-->>API: 이슈 목록
+    Platform-->>AppSvc: RemoteIssue 목록
+    AppSvc->>Issue: upsertIssues(...)
+    Issue->>DB: issue_caches upsert
+    AppSvc->>DB: sync-state 기록
+    Issue-->>AppSvc: 이슈 목록
+    AppSvc-->>API: 이슈 목록
     API-->>F: 이슈 목록
 
     U->>F: 이슈 상세 진입
     F->>API: GET /api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}
-    API->>Issue: getIssue(...)
+    API->>AppSvc: getIssue(...)
+    AppSvc->>Repo: requireAccessibleRepository(...)
+    AppSvc->>Issue: getIssue(...)
     Issue->>DB: issue_caches 조회
-    Issue-->>API: 이슈 상세
+    Issue-->>AppSvc: 이슈 상세
+    AppSvc-->>API: 이슈 상세
     API-->>F: 이슈 상세
 
     F->>API: GET /api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}/comments
-    API->>Comment: getComments(...)
-    Comment->>Issue: requireIssue(...)
+    API->>AppSvc: getComments(...)
+    AppSvc->>Issue: requireIssue(...)
+    AppSvc->>Comment: getComments(...)
     Comment->>DB: comment_caches 조회
-    Comment-->>API: 댓글 목록
+    Comment-->>AppSvc: 댓글 목록
+    AppSvc-->>API: 댓글 목록
     API-->>F: 댓글 목록
 
     U->>F: 이슈 생성/수정/닫기 또는 댓글 작성
     F->>API: 변경 API 호출
-    API->>Issue: 이슈 변경이면 IssueFacade 호출
-    API->>Comment: 댓글 변경이면 CommentFacade 호출
-    Issue->>Platform: 원격 이슈 생성/수정/닫기
-    Comment->>Platform: 원격 댓글 생성
+    API->>AppSvc: 변경 use case 호출
+    AppSvc->>Platform: 원격 이슈/댓글 생성/수정/닫기
     Platform->>Remote: 플랫폼 API 호출
     Remote-->>Platform: 변경 결과
-    Issue->>DB: issue_caches 및 sync-state 갱신
-    Comment->>DB: comment_caches 및 sync-state 갱신
+    AppSvc->>Issue: 이슈 변경 결과 cache 반영
+    AppSvc->>Comment: 댓글 변경 결과 cache 반영
+    Issue->>DB: issue_caches 갱신
+    Comment->>DB: comment_caches 갱신
+    AppSvc->>DB: sync-state 기록
     API-->>F: 변경 결과
 ```
 
@@ -151,7 +174,7 @@ sequenceDiagram
 
 ### 6.1 플랫폼 토큰 등록
 
-프론트는 선택된 플랫폼을 경로에 포함해 `POST /api/platforms/{platform}/token`을 호출한다. 백엔드는 먼저 `PlatformCredentialFacade`로 토큰을 검증하고, 검증 결과를 connection 모듈에 넘긴다.
+프론트는 선택된 플랫폼을 경로에 포함해 `POST /api/platforms/{platform}/token`을 호출한다. app controller는 application facade를 호출하고, application은 `PlatformCredentialFacade`로 토큰을 검증한 뒤 검증 결과를 connection 모듈에 넘긴다.
 
 connection 모듈은 PAT를 암호화해 저장하고 세션에 `currentUserId`, `currentPlatform`을 저장한다. 이후 요청은 프론트가 PAT를 다시 보내지 않고 세션과 저장된 토큰으로 처리된다.
 
@@ -159,13 +182,13 @@ connection 모듈은 PAT를 암호화해 저장하고 세션에 `currentUserId`,
 
 저장소 목록은 `GET /api/platforms/{platform}/repositories`로 캐시를 조회한다. 최신 원격 상태가 필요하면 `POST /api/platforms/{platform}/repositories/refresh`를 호출한다.
 
-새로고침 시 repository 모듈은 platform 모듈에서 접근 가능한 저장소 목록을 받아 `repository_caches`에 upsert한다. 조회 시에는 현재 연결 계정의 `ownerKey`와 일치하는 저장소만 반환한다.
+새로고침 시 application 모듈은 connection에서 token access를 얻고 platform gateway로 접근 가능한 저장소 목록을 조회한다. repository 모듈은 전달받은 원격 결과를 `repository_caches`에 upsert한다. 조회 시에는 현재 연결 계정의 `ownerKey`와 일치하는 저장소만 반환한다.
 
 ### 6.3 이슈 동기화와 조회
 
 이슈 목록은 `GET /api/platforms/{platform}/repositories/{repositoryId}/issues`로 캐시를 조회한다. `keyword`, `state` 쿼리로 캐시 결과를 필터링할 수 있다.
 
-새로고침은 `POST /api/platforms/{platform}/repositories/{repositoryId}/issues/refresh`가 담당한다. issue 모듈은 저장소 접근 권한을 확인한 뒤 platform 모듈을 통해 원격 이슈 목록을 조회하고 `issue_caches`에 반영한다.
+새로고침은 `POST /api/platforms/{platform}/repositories/{repositoryId}/issues/refresh`가 담당한다. application 모듈은 저장소 접근 권한을 확인한 뒤 platform gateway로 원격 이슈 목록을 조회하고, issue 모듈이 `issue_caches`에 반영한다.
 
 ### 6.4 이슈 생성, 수정, 닫기
 
@@ -209,11 +232,13 @@ connection 모듈은 PAT를 암호화해 저장하고 세션에 `currentUserId`,
 - 저장소 컨트롤러: `backend/app/src/main/java/com/jw/github_issue_manager/controller/RepositoryController.java`
 - 이슈 컨트롤러: `backend/app/src/main/java/com/jw/github_issue_manager/controller/IssueController.java`
 - 댓글 컨트롤러: `backend/app/src/main/java/com/jw/github_issue_manager/controller/CommentController.java`
+- application facade: `backend/application/src/main/java/com/jw/github_issue_manager/application`
 - 연결 서비스: `backend/connection/src/main/java/com/jw/github_issue_manager/connection/internal/service/AuthService.java`
 - 저장소 서비스: `backend/repository/src/main/java/com/jw/github_issue_manager/repository/internal/service/RepositoryService.java`
 - 이슈 서비스: `backend/issue/src/main/java/com/jw/github_issue_manager/issue/internal/service/IssueService.java`
 - 댓글 서비스: `backend/comment/src/main/java/com/jw/github_issue_manager/comment/internal/service/CommentService.java`
-- 플랫폼 facade: `backend/platform/src/main/java/com/jw/github_issue_manager/platform/api`
+- 플랫폼 gateway: `backend/platform/src/main/java/com/jw/github_issue_manager/core/platform`
+- 플랫폼 credential facade: `backend/platform/src/main/java/com/jw/github_issue_manager/platform/api`
 - 통합 테스트: `backend/app/src/test/java/com/jw/github_issue_manager/controller/ApiFlowIntegrationTest.java`
 
 ## 9. 정리
