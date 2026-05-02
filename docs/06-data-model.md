@@ -114,7 +114,7 @@
 ### `sync_states`
 
 - 마지막 동기화 상태
-- shared-kernel 모듈 소유
+- application 모듈 소유
 
 주요 필드
 

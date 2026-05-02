@@ -6,6 +6,7 @@
 - 기준: 실제 구현과 문서의 일치도를 높이되, 현재 구조를 그대로 고착하지 않는다.
 - 방향: remote 호출 조립 책임을 업무 모듈에서 분리하고 application 계층으로 모은다.
 - 결과: repository / issue / comment 모듈은 cache와 업무 규칙에 집중하고, platform은 외부 API adapter로 축소한다.
+- 적용 상태: 1~3단계 전환은 구현 완료되었고, 현재 구조 설명은 `03-architecture.md`, `05-platform-module-service-structure.md`, `11-use-case-sequence-diagrams.md`를 따른다.
 
 ## 1. 현재 구조의 문제
 
@@ -103,19 +104,15 @@ flowchart TD
 application
 └── src/main/java/com/jw/github_issue_manager/application
     ├── auth
-    │   ├── RegisterPlatformTokenUseCase
-    │   └── DisconnectPlatformTokenUseCase
+    │   └── AuthApplicationFacade
     ├── repository
-    │   ├── RefreshRepositoriesUseCase
-    │   └── GetRepositoryUseCase
+    │   └── RepositoryApplicationFacade
     ├── issue
-    │   ├── RefreshIssuesUseCase
-    │   ├── CreateIssueUseCase
-    │   ├── UpdateIssueUseCase
-    │   └── CloseIssueUseCase
+    │   └── IssueApplicationFacade
     ├── comment
-    │   ├── RefreshCommentsUseCase
-    │   └── CreateCommentUseCase
+    │   └── CommentApplicationFacade
+    ├── config
+    │   └── ApplicationSyncConfig
     ├── sync
     │   ├── SyncState
     │   ├── SyncResourceType
@@ -123,16 +120,15 @@ application
     │   ├── SyncStateRepository
     │   ├── SyncStateService
     │   └── SyncStateResponse
-    └── support
-        └── CurrentPlatformContextLoader
 ```
 
 - 패키지 기준: 기능 리소스별 패키지
-- 클래스 기준: 하나의 public use case는 하나의 사용자 행동만 담당
-- 공통 보조: 여러 use case가 공유하는 session/token/context 조회는 `support`로 제한
+- 현재 구현: 리소스별 `*ApplicationFacade`가 사용자 행동 단위 메서드를 제공한다.
+- 확장 기준: facade가 커지면 메서드 단위로 use case class를 분리한다.
+- 공통 보조: 여러 use case가 공유하는 session/token/context 조회가 커지면 별도 support로 분리한다.
 - 금지: `ApplicationService`, `PlatformUseCaseService` 같은 넓은 이름의 통합 서비스
 - 금지: `support`에서 업무 판단, cache 갱신, remote 호출을 직접 수행
-- 금지: application 내부 use case끼리 순환 호출
+- 금지: application 내부 facade/use case끼리 순환 호출
 - 허용: 상위 흐름을 위해 private helper 또는 package-private collaborator 사용
 - 검증: application 패키지 import 규칙을 ModuleBoundaryTest에 추가
 
@@ -301,14 +297,16 @@ sequenceDiagram
 
 ### 1단계: application 경계 생성
 
+- 상태: 완료
 - 작업: Gradle `application` 서브모듈 추가
 - 작업: app은 application public API만 호출하도록 전환
-- 작업: application 내부 패키지와 use case class 명명 규칙 적용
+- 작업: application 내부 패키지와 facade 경계 적용
 - 작업: ModuleBoundaryTest에 app -> application 중심 의존 방향 추가
 - 결과: HTTP 조립과 use case 조립 경계를 분리한다.
 
 ### 2단계: use case orchestration 이전
 
+- 상태: 완료
 - 작업: `PlatformRemoteFacade`의 token 조회 + gateway 호출 조립을 application으로 이동
 - 작업: repository / issue / comment에서 platform 직접 의존 제거
 - 작업: remote 결과 반영용 public API를 업무 모듈에 추가
@@ -317,6 +315,7 @@ sequenceDiagram
 
 ### 3단계: 모듈 경계 고정
 
+- 상태: 완료
 - 작업: platform은 gateway, client, mapper 중심으로 축소
 - 작업: shared-kernel에는 `PlatformType`만 유지
 - 작업: 공통 `ResourceNotFoundException`을 모듈별 not found 예외로 분리

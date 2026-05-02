@@ -32,6 +32,7 @@
 - 목표: 서비스가 GitHub client가 아니라 플랫폼 공통 API에 의존하도록 전환
 - 목표: credential 저장과 원격 API 호출 책임을 분리
 - 목표: repository / issue / comment 모듈이 token, baseUrl, adapter 구현을 모르게 함
+- 목표: remote 호출 조립과 sync 기록 책임을 application 계층으로 이동
 - 목표: 모듈 경계와 금지 의존을 테스트로 고정
 
 이 프로젝트의 목표는 다중 플랫폼 기능을 완성하는 것이 아니라, 다중 플랫폼을 수용할 수 있는 백엔드 경계를 만드는 것이었다.
@@ -50,11 +51,11 @@
 - 조치: token access를 connection public API 뒤로 제한
 - 결과: credential 저장 방식이 업무 모듈에 노출되지 않음
 
-### 4.3 원격 호출 책임을 platform으로 집중
+### 4.3 원격 API adapter 격리
 
 - 조치: GitHub/GitLab client, gateway, mapper를 platform 모듈 내부에 격리
-- 조치: repository / issue / comment는 `PlatformRemoteFacade`를 통해서만 원격 호출
-- 결과: 업무 모듈은 GitHub/GitLab adapter와 baseUrl 처리 방식을 모름
+- 조치: platform은 token 저장소나 cache 저장소를 모르는 adapter boundary로 축소
+- 결과: GitHub/GitLab adapter와 baseUrl 처리 방식이 업무 모듈에 노출되지 않음
 
 ### 4.4 업무 캐시 모듈 분리
 
@@ -62,9 +63,24 @@
 - 조치: 상위 리소스 확인은 다른 모듈 entity가 아니라 public API result로 처리
 - 결과: 각 업무 모듈의 소유 데이터와 호출 경계가 명확해짐
 
-### 4.5 Gradle 멀티 모듈 전환
+### 4.5 application 계층 도입
 
-- 조치: `app`, `platform`, `connection`, `repository`, `issue`, `comment`, `shared-kernel` 모듈 구성
+- 조치: `application` Gradle 서브모듈 추가
+- 조치: app controller는 application facade만 호출하도록 전환
+- 조치: connection token 조회, platform gateway 호출, cache 반영, sync 기록을 application에서 조립
+- 조치: repository / issue / comment의 remote 호출 직접 의존 제거
+- 결과: HTTP 조립과 use case orchestration 경계를 분리
+
+### 4.6 shared-kernel 축소
+
+- 조치: SyncState 클러스터를 application으로 이동
+- 조치: 공통 `ResourceNotFoundException`을 모듈별 not found 예외로 분리
+- 조치: shared-kernel은 `PlatformType`만 유지
+- 결과: 공통 모듈이 업무 규칙 저장소로 커지는 위험을 줄임
+
+### 4.7 Gradle 멀티 모듈 전환
+
+- 조치: `app`, `application`, `platform`, `connection`, `repository`, `issue`, `comment`, `shared-kernel` 모듈 구성
 - 조치: app은 HTTP 조립과 bootstrapping 중심으로 축소
 - 결과: 잘못된 모듈 import를 Gradle 의존성과 테스트로 함께 제한 가능
 
@@ -73,41 +89,38 @@
 ```mermaid
 flowchart TD
     App["app\nHTTP / bootstrapping"]
+    Application["application\nuse case orchestration"]
     Platform["platform\nremote API / adapter"]
     Connection["connection\ncredential / session"]
     Repository["repository\nrepository cache"]
     Issue["issue\nissue cache"]
     Comment["comment\ncomment cache"]
-    Shared["shared-kernel\nsync / common"]
+    Shared["shared-kernel\nPlatformType only"]
 
-    App --> Platform
-    App --> Connection
-    App --> Repository
-    App --> Issue
-    App --> Comment
-    App --> Shared
+    App --> Application
 
-    Repository --> Platform
+    Application --> Platform
+    Application --> Connection
+    Application --> Repository
+    Application --> Issue
+    Application --> Comment
+    Application --> Shared
+
     Repository --> Shared
-    Issue --> Repository
-    Issue --> Platform
     Issue --> Shared
-    Comment --> Issue
-    Comment --> Repository
-    Comment --> Platform
     Comment --> Shared
-    Platform --> Connection
     Platform --> Shared
     Connection --> Shared
 ```
 
 - `app`: controller, exception handler, 실행 조립
-- `platform`: 플랫폼 검증, 원격 API 호출, GitHub/GitLab adapter 선택
+- `application`: 유스케이스 조립, remote 호출 순서, cache 반영 순서, sync 기록
+- `platform`: 플랫폼 검증, 원격 API gateway, GitHub/GitLab adapter 선택
 - `connection`: 토큰 저장, 암호화, 세션 기준 연결 상태 관리
-- `repository`: 저장소 캐시와 refresh 유스케이스
-- `issue`: 이슈 캐시와 생성/수정/닫기 유스케이스
-- `comment`: 댓글 캐시와 작성/refresh 유스케이스
-- `shared-kernel`: 동기화 상태와 공통 예외
+- `repository`: 저장소 캐시와 접근 확인
+- `issue`: 이슈 캐시와 접근 확인
+- `comment`: 댓글 캐시
+- `shared-kernel`: `PlatformType`
 
 ## 6. 검증 방식
 
