@@ -18,7 +18,7 @@ import com.jw.github_issue_manager.issue.api.dto.CreateIssueRequest;
 import com.jw.github_issue_manager.issue.api.dto.IssueDetailResponse;
 import com.jw.github_issue_manager.issue.api.dto.IssueSummaryResponse;
 import com.jw.github_issue_manager.issue.api.dto.UpdateIssueRequest;
-import com.jw.github_issue_manager.shared.api.dto.SyncStateResponse;
+import com.jw.github_issue_manager.application.sync.SyncStateResponse;
 
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;

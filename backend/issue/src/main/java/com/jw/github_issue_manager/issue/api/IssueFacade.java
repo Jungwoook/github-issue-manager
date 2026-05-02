@@ -5,14 +5,10 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.jw.github_issue_manager.core.platform.PlatformType;
-import com.jw.github_issue_manager.issue.api.dto.CreateIssueRequest;
+import com.jw.github_issue_manager.core.remote.RemoteIssue;
 import com.jw.github_issue_manager.issue.api.dto.IssueDetailResponse;
 import com.jw.github_issue_manager.issue.api.dto.IssueSummaryResponse;
-import com.jw.github_issue_manager.issue.api.dto.UpdateIssueRequest;
-import com.jw.github_issue_manager.shared.api.dto.SyncStateResponse;
 import com.jw.github_issue_manager.issue.internal.service.IssueService;
-
-import jakarta.servlet.http.HttpSession;
 
 @Service
 public class IssueFacade {
@@ -27,48 +23,24 @@ public class IssueFacade {
         PlatformType platform,
         String repositoryId,
         String keyword,
-        String state,
-        HttpSession session
+        String state
     ) {
-        return issueService.getIssues(platform, repositoryId, keyword, state, session);
+        return issueService.getIssues(platform, repositoryId, keyword, state);
     }
 
-    public List<IssueSummaryResponse> refreshIssues(PlatformType platform, String repositoryId, HttpSession session) {
-        return issueService.refreshIssues(platform, repositoryId, session);
+    public List<IssueSummaryResponse> upsertIssues(PlatformType platform, String repositoryId, List<RemoteIssue> issues) {
+        return issueService.upsertIssues(platform, repositoryId, issues);
     }
 
-    public IssueDetailResponse createIssue(
-        PlatformType platform,
-        String repositoryId,
-        CreateIssueRequest request,
-        HttpSession session
-    ) {
-        return issueService.createIssue(platform, repositoryId, request, session);
+    public IssueDetailResponse upsertIssue(PlatformType platform, String repositoryId, RemoteIssue issue) {
+        return issueService.upsertIssue(platform, repositoryId, issue);
     }
 
-    public IssueDetailResponse getIssue(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
-        return issueService.getIssue(platform, repositoryId, issueNumberOrKey, session);
+    public IssueDetailResponse getIssue(PlatformType platform, String repositoryId, String issueNumberOrKey) {
+        return issueService.getIssue(platform, repositoryId, issueNumberOrKey);
     }
 
-    public IssueDetailResponse updateIssue(
-        PlatformType platform,
-        String repositoryId,
-        String issueNumberOrKey,
-        UpdateIssueRequest request,
-        HttpSession session
-    ) {
-        return issueService.updateIssue(platform, repositoryId, issueNumberOrKey, request, session);
-    }
-
-    public void deleteIssue(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
-        issueService.deleteIssue(platform, repositoryId, issueNumberOrKey, session);
-    }
-
-    public SyncStateResponse getIssueSyncState(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
-        return issueService.getIssueSyncState(platform, repositoryId, issueNumberOrKey, session);
-    }
-
-    public IssueAccess requireIssue(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
-        return issueService.requireIssue(platform, repositoryId, issueNumberOrKey, session);
+    public IssueAccess requireIssue(PlatformType platform, String repositoryId, String issueNumberOrKey) {
+        return issueService.requireIssue(platform, repositoryId, issueNumberOrKey);
     }
 }

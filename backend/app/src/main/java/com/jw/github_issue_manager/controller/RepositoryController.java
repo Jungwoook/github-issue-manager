@@ -10,8 +10,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.jw.github_issue_manager.application.repository.RepositoryApplicationFacade;
+import com.jw.github_issue_manager.application.sync.SyncStateResponse;
 import com.jw.github_issue_manager.repository.api.dto.RepositoryResponse;
-import com.jw.github_issue_manager.shared.api.dto.SyncStateResponse;
 
 import jakarta.servlet.http.HttpSession;
 

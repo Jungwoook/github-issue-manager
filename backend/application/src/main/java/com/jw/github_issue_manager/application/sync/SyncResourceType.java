@@ -1,4 +1,4 @@
-package com.jw.github_issue_manager.domain;
+package com.jw.github_issue_manager.application.sync;
 
 public enum SyncResourceType {
     REPOSITORY_LIST,

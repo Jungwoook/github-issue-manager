@@ -10,6 +10,7 @@ dependencies {
 	api project(':repository')
 	api project(':shared-kernel')
 
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 }

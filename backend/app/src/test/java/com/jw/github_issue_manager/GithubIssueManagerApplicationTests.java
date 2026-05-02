@@ -19,7 +19,7 @@ import com.jw.github_issue_manager.comment.internal.domain.CommentCache;
 import com.jw.github_issue_manager.issue.internal.domain.IssueCache;
 import com.jw.github_issue_manager.connection.internal.domain.PlatformConnection;
 import com.jw.github_issue_manager.repository.internal.domain.RepositoryCache;
-import com.jw.github_issue_manager.domain.SyncState;
+import com.jw.github_issue_manager.application.sync.SyncState;
 import com.jw.github_issue_manager.connection.internal.domain.User;
 import com.jw.github_issue_manager.issue.api.IssueFacade;
 import com.jw.github_issue_manager.repository.api.RepositoryFacade;

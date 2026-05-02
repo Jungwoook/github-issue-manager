@@ -5,11 +5,9 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.jw.github_issue_manager.core.platform.PlatformType;
+import com.jw.github_issue_manager.core.remote.RemoteComment;
 import com.jw.github_issue_manager.comment.api.dto.CommentResponse;
-import com.jw.github_issue_manager.comment.api.dto.CreateCommentRequest;
 import com.jw.github_issue_manager.comment.internal.service.CommentService;
-
-import jakarta.servlet.http.HttpSession;
 
 @Service
 public class CommentFacade {
@@ -22,29 +20,24 @@ public class CommentFacade {
 
     public List<CommentResponse> getComments(
         PlatformType platform,
-        String repositoryId,
-        String issueNumberOrKey,
-        HttpSession session
+        String issueExternalId
     ) {
-        return commentService.getComments(platform, repositoryId, issueNumberOrKey, session);
+        return commentService.getComments(platform, issueExternalId);
     }
 
-    public List<CommentResponse> refreshComments(
+    public List<CommentResponse> upsertComments(
         PlatformType platform,
-        String repositoryId,
-        String issueNumberOrKey,
-        HttpSession session
+        String issueExternalId,
+        List<RemoteComment> comments
     ) {
-        return commentService.refreshComments(platform, repositoryId, issueNumberOrKey, session);
+        return commentService.upsertComments(platform, issueExternalId, comments);
     }
 
-    public CommentResponse createComment(
+    public CommentResponse upsertComment(
         PlatformType platform,
-        String repositoryId,
-        String issueNumberOrKey,
-        CreateCommentRequest request,
-        HttpSession session
+        String issueExternalId,
+        RemoteComment comment
     ) {
-        return commentService.createComment(platform, repositoryId, issueNumberOrKey, request, session);
+        return commentService.upsertComment(platform, issueExternalId, comment);
     }
 }

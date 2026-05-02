@@ -5,11 +5,9 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.jw.github_issue_manager.core.platform.PlatformType;
+import com.jw.github_issue_manager.core.remote.RemoteRepository;
 import com.jw.github_issue_manager.repository.api.dto.RepositoryResponse;
-import com.jw.github_issue_manager.shared.api.dto.SyncStateResponse;
 import com.jw.github_issue_manager.repository.internal.service.RepositoryService;
-
-import jakarta.servlet.http.HttpSession;
 
 @Service
 public class RepositoryFacade {
@@ -20,23 +18,19 @@ public class RepositoryFacade {
         this.repositoryService = repositoryService;
     }
 
-    public List<RepositoryResponse> getRepositories(PlatformType platform, HttpSession session) {
-        return repositoryService.getRepositories(platform, session);
+    public List<RepositoryResponse> getRepositories(PlatformType platform, String accountLogin) {
+        return repositoryService.getRepositories(platform, accountLogin);
     }
 
-    public List<RepositoryResponse> refreshRepositories(PlatformType platform, HttpSession session) {
-        return repositoryService.refreshRepositories(platform, session);
+    public List<RepositoryResponse> upsertRepositories(PlatformType platform, String accountLogin, List<RemoteRepository> repositories) {
+        return repositoryService.upsertRepositories(platform, accountLogin, repositories);
     }
 
-    public RepositoryResponse getRepository(PlatformType platform, String repositoryId, HttpSession session) {
-        return repositoryService.getRepository(platform, repositoryId, session);
+    public RepositoryResponse getRepository(PlatformType platform, String repositoryId, String accountLogin) {
+        return repositoryService.getRepository(platform, repositoryId, accountLogin);
     }
 
-    public SyncStateResponse getRepositorySyncState(PlatformType platform, String repositoryId, HttpSession session) {
-        return repositoryService.getRepositorySyncState(platform, repositoryId, session);
-    }
-
-    public RepositoryAccess requireAccessibleRepository(PlatformType platform, String repositoryId, HttpSession session) {
-        return repositoryService.requireAccessibleRepository(platform, repositoryId, session);
+    public RepositoryAccess requireAccessibleRepository(PlatformType platform, String repositoryId, String accountLogin) {
+        return repositoryService.requireAccessibleRepository(platform, repositoryId, accountLogin);
     }
 }

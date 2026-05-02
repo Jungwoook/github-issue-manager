@@ -8,40 +8,19 @@ import org.springframework.transaction.annotation.Transactional;
 import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.core.remote.RemoteIssue;
 import com.jw.github_issue_manager.issue.internal.domain.IssueCache;
-import com.jw.github_issue_manager.domain.SyncResourceType;
-import com.jw.github_issue_manager.issue.api.dto.CreateIssueRequest;
 import com.jw.github_issue_manager.issue.api.dto.IssueDetailResponse;
 import com.jw.github_issue_manager.issue.api.dto.IssueSummaryResponse;
-import com.jw.github_issue_manager.issue.api.dto.UpdateIssueRequest;
-import com.jw.github_issue_manager.shared.api.dto.SyncStateResponse;
 import com.jw.github_issue_manager.exception.ResourceNotFoundException;
 import com.jw.github_issue_manager.issue.api.IssueAccess;
 import com.jw.github_issue_manager.issue.internal.repository.IssueCacheRepository;
-import com.jw.github_issue_manager.platform.api.PlatformRemoteFacade;
-import com.jw.github_issue_manager.repository.api.RepositoryAccess;
-import com.jw.github_issue_manager.repository.api.RepositoryFacade;
-import com.jw.github_issue_manager.service.SyncStateService;
-
-import jakarta.servlet.http.HttpSession;
 
 @Service
 public class IssueService {
 
     private final IssueCacheRepository issueCacheRepository;
-    private final RepositoryFacade repositoryFacade;
-    private final SyncStateService syncStateService;
-    private final PlatformRemoteFacade platformRemoteFacade;
 
-    public IssueService(
-        IssueCacheRepository issueCacheRepository,
-        RepositoryFacade repositoryFacade,
-        SyncStateService syncStateService,
-        PlatformRemoteFacade platformRemoteFacade
-    ) {
+    public IssueService(IssueCacheRepository issueCacheRepository) {
         this.issueCacheRepository = issueCacheRepository;
-        this.repositoryFacade = repositoryFacade;
-        this.syncStateService = syncStateService;
-        this.platformRemoteFacade = platformRemoteFacade;
     }
 
     @Transactional(readOnly = true)
@@ -49,11 +28,8 @@ public class IssueService {
         PlatformType platform,
         String repositoryId,
         String keyword,
-        String state,
-        HttpSession session
+        String state
     ) {
-        repositoryFacade.requireAccessibleRepository(platform, repositoryId, session);
-
         return issueCacheRepository.findByPlatformAndRepositoryExternalIdOrderByNumberOrKeyDesc(platform, repositoryId).stream()
             .filter(issue -> keyword == null || keyword.isBlank() || containsIgnoreCase(issue.getTitle(), keyword) || containsIgnoreCase(issue.getBody(), keyword))
             .filter(issue -> state == null || state.isBlank() || issue.getState().equalsIgnoreCase(state))
@@ -62,126 +38,35 @@ public class IssueService {
     }
 
     @Transactional
-    public List<IssueSummaryResponse> refreshIssues(PlatformType platform, String repositoryId, HttpSession session) {
-        RepositoryAccess repository = repositoryFacade.requireAccessibleRepository(platform, repositoryId, session);
-        List<RemoteIssue> issues = platformRemoteFacade.getRepositoryIssues(
-            platform,
-            session,
-            repository.ownerKey(),
-            repository.name()
-        );
-        issues.forEach(issue -> upsertIssue(repository, issue));
-
-        syncStateService.recordSuccess(
-            SyncResourceType.REPOSITORY,
-            repositoryKey(platform, repositoryId),
-            "Issue cache refreshed for repository."
-        );
-
-        return getIssues(platform, repositoryId, null, null, session);
+    public List<IssueSummaryResponse> upsertIssues(PlatformType platform, String repositoryId, List<RemoteIssue> issues) {
+        issues.forEach(issue -> upsertIssue(platform, repositoryId, issue));
+        return getIssues(platform, repositoryId, null, null);
     }
 
     @Transactional
-    public IssueDetailResponse createIssue(PlatformType platform, String repositoryId, CreateIssueRequest request, HttpSession session) {
-        RepositoryAccess repository = repositoryFacade.requireAccessibleRepository(platform, repositoryId, session);
-        RemoteIssue createdIssue = platformRemoteFacade.createIssue(
-            platform,
-            session,
-            repository.ownerKey(),
-            repository.name(),
-            request.title(),
-            request.body()
-        );
-        IssueCache issue = upsertIssue(repository, createdIssue);
-
-        syncStateService.recordSuccess(
-            SyncResourceType.ISSUE,
-            issueKey(platform, repositoryId, issue.getNumberOrKey()),
-            "Issue created in cache."
-        );
-
-        return toDetailResponse(issue);
+    public IssueDetailResponse upsertIssue(PlatformType platform, String repositoryId, RemoteIssue issue) {
+        return toDetailResponse(upsertIssueCache(platform, repositoryId, issue));
     }
 
     @Transactional(readOnly = true)
-    public IssueDetailResponse getIssue(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
-        return toDetailResponse(requireIssueCache(platform, repositoryId, issueNumberOrKey, session));
-    }
-
-    @Transactional
-    public IssueDetailResponse updateIssue(
-        PlatformType platform,
-        String repositoryId,
-        String issueNumberOrKey,
-        UpdateIssueRequest request,
-        HttpSession session
-    ) {
-        RepositoryAccess repository = repositoryFacade.requireAccessibleRepository(platform, repositoryId, session);
-        IssueCache currentIssue = requireIssueCache(platform, repositoryId, issueNumberOrKey, session);
-
-        RemoteIssue updatedIssue = platformRemoteFacade.updateIssue(
-            platform,
-            session,
-            repository.ownerKey(),
-            repository.name(),
-            issueNumberOrKey,
-            request.title() != null ? request.title() : currentIssue.getTitle(),
-            request.body() != null ? request.body() : currentIssue.getBody(),
-            normalizeState(request.state(), currentIssue.getState())
-        );
-        IssueCache issue = upsertIssue(repository, updatedIssue);
-
-        syncStateService.recordSuccess(
-            SyncResourceType.ISSUE,
-            issueKey(platform, repositoryId, issueNumberOrKey),
-            "Issue cache updated."
-        );
-
-        return toDetailResponse(issue);
-    }
-
-    @Transactional
-    public void deleteIssue(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
-        RepositoryAccess repository = repositoryFacade.requireAccessibleRepository(platform, repositoryId, session);
-        platformRemoteFacade.updateIssue(
-            platform,
-            session,
-            repository.ownerKey(),
-            repository.name(),
-            issueNumberOrKey,
-            null,
-            null,
-            "CLOSED"
-        );
-        refreshIssues(platform, repositoryId, session);
-        syncStateService.recordSuccess(
-            SyncResourceType.ISSUE,
-            issueKey(platform, repositoryId, issueNumberOrKey),
-            "Issue was closed on platform."
-        );
+    public IssueDetailResponse getIssue(PlatformType platform, String repositoryId, String issueNumberOrKey) {
+        return toDetailResponse(requireIssueCache(platform, repositoryId, issueNumberOrKey));
     }
 
     @Transactional(readOnly = true)
-    public SyncStateResponse getIssueSyncState(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
-        requireIssue(platform, repositoryId, issueNumberOrKey, session);
-        return syncStateService.getSyncState(SyncResourceType.ISSUE, issueKey(platform, repositoryId, issueNumberOrKey));
+    public IssueAccess requireIssue(PlatformType platform, String repositoryId, String issueNumberOrKey) {
+        return toAccess(requireIssueCache(platform, repositoryId, issueNumberOrKey));
     }
 
-    @Transactional(readOnly = true)
-    public IssueAccess requireIssue(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
-        return toAccess(requireIssueCache(platform, repositoryId, issueNumberOrKey, session));
-    }
-
-    private IssueCache requireIssueCache(PlatformType platform, String repositoryId, String issueNumberOrKey, HttpSession session) {
-        repositoryFacade.requireAccessibleRepository(platform, repositoryId, session);
+    private IssueCache requireIssueCache(PlatformType platform, String repositoryId, String issueNumberOrKey) {
         return issueCacheRepository.findByPlatformAndRepositoryExternalIdAndNumberOrKey(platform, repositoryId, issueNumberOrKey)
             .orElseThrow(() -> new ResourceNotFoundException("ISSUE_NOT_FOUND", "Issue was not found."));
     }
 
-    private IssueCache upsertIssue(RepositoryAccess repository, RemoteIssue issueInfo) {
+    private IssueCache upsertIssueCache(PlatformType platform, String repositoryId, RemoteIssue issueInfo) {
         return issueCacheRepository.findByPlatformAndRepositoryExternalIdAndNumberOrKey(
-                repository.platform(),
-                repository.externalId(),
+                platform,
+                repositoryId,
                 issueInfo.numberOrKey()
             )
             .map(existing -> {
@@ -189,9 +74,9 @@ public class IssueService {
                 return existing;
             })
             .orElseGet(() -> issueCacheRepository.save(new IssueCache(
-                repository.platform(),
+                platform,
                 issueInfo.externalId(),
-                repository.externalId(),
+                repositoryId,
                 issueInfo.numberOrKey(),
                 issueInfo.title(),
                 issueInfo.body(),
@@ -213,14 +98,6 @@ public class IssueService {
             return currentState;
         }
         return state.toUpperCase();
-    }
-
-    private String repositoryKey(PlatformType platform, String repositoryId) {
-        return platform.name() + ":" + repositoryId;
-    }
-
-    private String issueKey(PlatformType platform, String repositoryId, String issueNumberOrKey) {
-        return platform.name() + ":" + repositoryId + ":" + issueNumberOrKey;
     }
 
     private IssueSummaryResponse toSummaryResponse(IssueCache issue) {

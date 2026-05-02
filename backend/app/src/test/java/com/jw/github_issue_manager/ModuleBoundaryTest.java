@@ -40,10 +40,10 @@ class ModuleBoundaryTest {
         Map<String, Set<String>> expectedDependencies = Map.of(
             "app", Set.of("application"),
             "application", Set.of("comment", "connection", "issue", "platform", "repository", "shared-kernel"),
-            "comment", Set.of("issue", "platform", "repository", "shared-kernel"),
+            "comment", Set.of("platform", "shared-kernel"),
             "connection", Set.of("shared-kernel"),
-            "issue", Set.of("platform", "repository", "shared-kernel"),
-            "platform", Set.of("connection", "shared-kernel"),
+            "issue", Set.of("platform", "shared-kernel"),
+            "platform", Set.of("shared-kernel"),
             "repository", Set.of("platform", "shared-kernel"),
             "shared-kernel", Set.of()
         );
