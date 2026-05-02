@@ -6,8 +6,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.jw.github_issue_manager.core.platform.PlatformType;
-import com.jw.github_issue_manager.connection.api.PlatformConnectionFacade;
+import com.jw.github_issue_manager.application.auth.AuthApplicationFacade;
 import com.jw.github_issue_manager.connection.api.dto.MeResponse;
 import com.jw.github_issue_manager.connection.api.dto.PlatformConnectionResponse;
 
@@ -17,15 +16,15 @@ import jakarta.servlet.http.HttpSession;
 @RequestMapping("/api/users/me")
 public class UserController {
 
-    private final PlatformConnectionFacade platformConnectionFacade;
+    private final AuthApplicationFacade authApplicationFacade;
 
-    public UserController(PlatformConnectionFacade platformConnectionFacade) {
-        this.platformConnectionFacade = platformConnectionFacade;
+    public UserController(AuthApplicationFacade authApplicationFacade) {
+        this.authApplicationFacade = authApplicationFacade;
     }
 
     @GetMapping
     public ResponseEntity<MeResponse> me(HttpSession session) {
-        return ResponseEntity.ok(platformConnectionFacade.getCurrentUser(session));
+        return ResponseEntity.ok(authApplicationFacade.me(session));
     }
 
     @GetMapping("/platform-connections/{platform}")
@@ -33,6 +32,6 @@ public class UserController {
         @PathVariable String platform,
         HttpSession session
     ) {
-        return ResponseEntity.ok(platformConnectionFacade.getCurrentPlatformConnection(PlatformType.from(platform), session));
+        return ResponseEntity.ok(authApplicationFacade.platformConnection(platform, session));
     }
 }

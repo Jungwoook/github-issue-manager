@@ -22,6 +22,7 @@ class ModuleBoundaryTest {
         "(?m)^\\s*(?<scope>api|implementation)\\s+project\\(':(?<module>[^']+)'\\)"
     );
     private static final Set<String> APP_ALLOWED_API_IMPORTS = Set.of(
+        "com.jw.github_issue_manager.application.",
         "com.jw.github_issue_manager.comment.api.",
         "com.jw.github_issue_manager.connection.api.",
         "com.jw.github_issue_manager.issue.api.",
@@ -37,7 +38,8 @@ class ModuleBoundaryTest {
     @Test
     void gradleModuleDependenciesFollowDocumentedDirection() throws IOException {
         Map<String, Set<String>> expectedDependencies = Map.of(
-            "app", Set.of("comment", "connection", "issue", "platform", "repository", "shared-kernel"),
+            "app", Set.of("application"),
+            "application", Set.of("comment", "connection", "issue", "platform", "repository", "shared-kernel"),
             "comment", Set.of("issue", "platform", "repository", "shared-kernel"),
             "connection", Set.of("shared-kernel"),
             "issue", Set.of("platform", "repository", "shared-kernel"),
@@ -59,6 +61,7 @@ class ModuleBoundaryTest {
     void gradleModuleApiDependenciesExposeOnlyPublicContracts() throws IOException {
         Map<String, Set<String>> expectedApiDependencies = Map.of(
             "app", Set.of(),
+            "application", Set.of("comment", "connection", "issue", "platform", "repository", "shared-kernel"),
             "comment", Set.of("platform"),
             "connection", Set.of("shared-kernel"),
             "issue", Set.of("platform", "shared-kernel"),

@@ -13,13 +13,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.jw.github_issue_manager.core.platform.PlatformType;
+import com.jw.github_issue_manager.application.issue.IssueApplicationFacade;
 import com.jw.github_issue_manager.issue.api.dto.CreateIssueRequest;
 import com.jw.github_issue_manager.issue.api.dto.IssueDetailResponse;
 import com.jw.github_issue_manager.issue.api.dto.IssueSummaryResponse;
 import com.jw.github_issue_manager.issue.api.dto.UpdateIssueRequest;
 import com.jw.github_issue_manager.shared.api.dto.SyncStateResponse;
-import com.jw.github_issue_manager.issue.api.IssueFacade;
 
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -28,10 +27,10 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/platforms/{platform}/repositories/{repositoryId}/issues")
 public class IssueController {
 
-    private final IssueFacade issueFacade;
+    private final IssueApplicationFacade issueApplicationFacade;
 
-    public IssueController(IssueFacade issueFacade) {
-        this.issueFacade = issueFacade;
+    public IssueController(IssueApplicationFacade issueApplicationFacade) {
+        this.issueApplicationFacade = issueApplicationFacade;
     }
 
     @GetMapping
@@ -42,7 +41,7 @@ public class IssueController {
         @RequestParam(required = false) String state,
         HttpSession session
     ) {
-        return ResponseEntity.ok(issueFacade.getIssues(PlatformType.from(platform), repositoryId, keyword, state, session));
+        return ResponseEntity.ok(issueApplicationFacade.getIssues(platform, repositoryId, keyword, state, session));
     }
 
     @PostMapping("/refresh")
@@ -51,7 +50,7 @@ public class IssueController {
         @PathVariable String repositoryId,
         HttpSession session
     ) {
-        return ResponseEntity.ok(issueFacade.refreshIssues(PlatformType.from(platform), repositoryId, session));
+        return ResponseEntity.ok(issueApplicationFacade.refreshIssues(platform, repositoryId, session));
     }
 
     @PostMapping
@@ -61,7 +60,7 @@ public class IssueController {
         @Valid @RequestBody CreateIssueRequest request,
         HttpSession session
     ) {
-        return ResponseEntity.ok(issueFacade.createIssue(PlatformType.from(platform), repositoryId, request, session));
+        return ResponseEntity.ok(issueApplicationFacade.createIssue(platform, repositoryId, request, session));
     }
 
     @GetMapping("/{issueNumberOrKey}")
@@ -71,7 +70,7 @@ public class IssueController {
         @PathVariable String issueNumberOrKey,
         HttpSession session
     ) {
-        return ResponseEntity.ok(issueFacade.getIssue(PlatformType.from(platform), repositoryId, issueNumberOrKey, session));
+        return ResponseEntity.ok(issueApplicationFacade.getIssue(platform, repositoryId, issueNumberOrKey, session));
     }
 
     @PatchMapping("/{issueNumberOrKey}")
@@ -82,7 +81,7 @@ public class IssueController {
         @RequestBody UpdateIssueRequest request,
         HttpSession session
     ) {
-        return ResponseEntity.ok(issueFacade.updateIssue(PlatformType.from(platform), repositoryId, issueNumberOrKey, request, session));
+        return ResponseEntity.ok(issueApplicationFacade.updateIssue(platform, repositoryId, issueNumberOrKey, request, session));
     }
 
     @DeleteMapping("/{issueNumberOrKey}")
@@ -92,7 +91,7 @@ public class IssueController {
         @PathVariable String issueNumberOrKey,
         HttpSession session
     ) {
-        issueFacade.deleteIssue(PlatformType.from(platform), repositoryId, issueNumberOrKey, session);
+        issueApplicationFacade.deleteIssue(platform, repositoryId, issueNumberOrKey, session);
         return ResponseEntity.noContent().build();
     }
 
@@ -103,6 +102,6 @@ public class IssueController {
         @PathVariable String issueNumberOrKey,
         HttpSession session
     ) {
-        return ResponseEntity.ok(issueFacade.getIssueSyncState(PlatformType.from(platform), repositoryId, issueNumberOrKey, session));
+        return ResponseEntity.ok(issueApplicationFacade.getIssueSyncState(platform, repositoryId, issueNumberOrKey, session));
     }
 }

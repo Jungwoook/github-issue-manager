@@ -9,10 +9,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.jw.github_issue_manager.core.platform.PlatformType;
+import com.jw.github_issue_manager.application.repository.RepositoryApplicationFacade;
 import com.jw.github_issue_manager.repository.api.dto.RepositoryResponse;
 import com.jw.github_issue_manager.shared.api.dto.SyncStateResponse;
-import com.jw.github_issue_manager.repository.api.RepositoryFacade;
 
 import jakarta.servlet.http.HttpSession;
 
@@ -20,20 +19,20 @@ import jakarta.servlet.http.HttpSession;
 @RequestMapping("/api/platforms/{platform}/repositories")
 public class RepositoryController {
 
-    private final RepositoryFacade repositoryFacade;
+    private final RepositoryApplicationFacade repositoryApplicationFacade;
 
-    public RepositoryController(RepositoryFacade repositoryFacade) {
-        this.repositoryFacade = repositoryFacade;
+    public RepositoryController(RepositoryApplicationFacade repositoryApplicationFacade) {
+        this.repositoryApplicationFacade = repositoryApplicationFacade;
     }
 
     @GetMapping
     public ResponseEntity<List<RepositoryResponse>> getRepositories(@PathVariable String platform, HttpSession session) {
-        return ResponseEntity.ok(repositoryFacade.getRepositories(PlatformType.from(platform), session));
+        return ResponseEntity.ok(repositoryApplicationFacade.getRepositories(platform, session));
     }
 
     @PostMapping("/refresh")
     public ResponseEntity<List<RepositoryResponse>> refreshRepositories(@PathVariable String platform, HttpSession session) {
-        return ResponseEntity.ok(repositoryFacade.refreshRepositories(PlatformType.from(platform), session));
+        return ResponseEntity.ok(repositoryApplicationFacade.refreshRepositories(platform, session));
     }
 
     @GetMapping("/{repositoryId}")
@@ -42,7 +41,7 @@ public class RepositoryController {
         @PathVariable String repositoryId,
         HttpSession session
     ) {
-        return ResponseEntity.ok(repositoryFacade.getRepository(PlatformType.from(platform), repositoryId, session));
+        return ResponseEntity.ok(repositoryApplicationFacade.getRepository(platform, repositoryId, session));
     }
 
     @GetMapping("/{repositoryId}/sync-state")
@@ -51,6 +50,6 @@ public class RepositoryController {
         @PathVariable String repositoryId,
         HttpSession session
     ) {
-        return ResponseEntity.ok(repositoryFacade.getRepositorySyncState(PlatformType.from(platform), repositoryId, session));
+        return ResponseEntity.ok(repositoryApplicationFacade.getRepositorySyncState(platform, repositoryId, session));
     }
 }

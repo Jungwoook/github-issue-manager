@@ -1,0 +1,15 @@
+plugins {
+	id 'java-library'
+}
+
+dependencies {
+	api project(':comment')
+	api project(':connection')
+	api project(':issue')
+	api project(':platform')
+	api project(':repository')
+	api project(':shared-kernel')
+
+	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+}
