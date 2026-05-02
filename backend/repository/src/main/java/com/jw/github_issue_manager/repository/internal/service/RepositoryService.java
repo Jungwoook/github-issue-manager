@@ -8,82 +8,51 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.core.remote.RemoteRepository;
-import com.jw.github_issue_manager.repository.internal.domain.RepositoryCache;
-import com.jw.github_issue_manager.domain.SyncResourceType;
-import com.jw.github_issue_manager.repository.api.dto.RepositoryResponse;
-import com.jw.github_issue_manager.shared.api.dto.SyncStateResponse;
-import com.jw.github_issue_manager.exception.ResourceNotFoundException;
-import com.jw.github_issue_manager.platform.api.PlatformRemoteFacade;
-import com.jw.github_issue_manager.platform.api.dto.CurrentPlatformConnection;
 import com.jw.github_issue_manager.repository.api.RepositoryAccess;
+import com.jw.github_issue_manager.repository.api.RepositoryNotFoundException;
+import com.jw.github_issue_manager.repository.api.dto.RepositoryResponse;
+import com.jw.github_issue_manager.repository.internal.domain.RepositoryCache;
 import com.jw.github_issue_manager.repository.internal.repository.RepositoryCacheRepository;
-import com.jw.github_issue_manager.service.SyncStateService;
-
-import jakarta.servlet.http.HttpSession;
 
 @Service
 public class RepositoryService {
 
     private final RepositoryCacheRepository repositoryCacheRepository;
-    private final SyncStateService syncStateService;
-    private final PlatformRemoteFacade platformRemoteFacade;
 
-    public RepositoryService(
-        RepositoryCacheRepository repositoryCacheRepository,
-        SyncStateService syncStateService,
-        PlatformRemoteFacade platformRemoteFacade
-    ) {
+    public RepositoryService(RepositoryCacheRepository repositoryCacheRepository) {
         this.repositoryCacheRepository = repositoryCacheRepository;
-        this.syncStateService = syncStateService;
-        this.platformRemoteFacade = platformRemoteFacade;
     }
 
     @Transactional(readOnly = true)
-    public List<RepositoryResponse> getRepositories(PlatformType platform, HttpSession session) {
-        String login = platformRemoteFacade.requireCurrentConnection(platform, session).accountLogin();
-        return repositoryCacheRepository.findByPlatformAndOwnerKeyOrderByFullNameAsc(platform, login).stream()
+    public List<RepositoryResponse> getRepositories(PlatformType platform, String accountLogin) {
+        return repositoryCacheRepository.findByPlatformAndOwnerKeyOrderByFullNameAsc(platform, accountLogin).stream()
             .map(this::toResponse)
             .toList();
     }
 
     @Transactional
-    public List<RepositoryResponse> refreshRepositories(PlatformType platform, HttpSession session) {
-        CurrentPlatformConnection connection = platformRemoteFacade.requireCurrentConnection(platform, session);
-        List<RemoteRepository> repositories = platformRemoteFacade.getAccessibleRepositories(platform, session);
+    public List<RepositoryResponse> upsertRepositories(PlatformType platform, String accountLogin, List<RemoteRepository> repositories) {
         repositories.forEach(this::upsertRepository);
 
-        syncStateService.recordSuccess(
-            SyncResourceType.REPOSITORY_LIST,
-            platform.name() + ":" + connection.accountLogin(),
-            "Repository cache refreshed."
-        );
-
-        return getRepositories(platform, session);
+        return getRepositories(platform, accountLogin);
     }
 
     @Transactional(readOnly = true)
-    public RepositoryResponse getRepository(PlatformType platform, String repositoryId, HttpSession session) {
-        return toResponse(requireAccessibleRepositoryCache(platform, repositoryId, session));
+    public RepositoryResponse getRepository(PlatformType platform, String repositoryId, String accountLogin) {
+        return toResponse(requireAccessibleRepositoryCache(platform, repositoryId, accountLogin));
     }
 
     @Transactional(readOnly = true)
-    public SyncStateResponse getRepositorySyncState(PlatformType platform, String repositoryId, HttpSession session) {
-        requireAccessibleRepository(platform, repositoryId, session);
-        return syncStateService.getSyncState(SyncResourceType.REPOSITORY, resourceKey(platform, repositoryId));
+    public RepositoryAccess requireAccessibleRepository(PlatformType platform, String repositoryId, String accountLogin) {
+        return toAccess(requireAccessibleRepositoryCache(platform, repositoryId, accountLogin));
     }
 
-    @Transactional(readOnly = true)
-    public RepositoryAccess requireAccessibleRepository(PlatformType platform, String repositoryId, HttpSession session) {
-        return toAccess(requireAccessibleRepositoryCache(platform, repositoryId, session));
-    }
-
-    private RepositoryCache requireAccessibleRepositoryCache(PlatformType platform, String repositoryId, HttpSession session) {
-        CurrentPlatformConnection connection = platformRemoteFacade.requireCurrentConnection(platform, session);
+    private RepositoryCache requireAccessibleRepositoryCache(PlatformType platform, String repositoryId, String accountLogin) {
         RepositoryCache repository = repositoryCacheRepository.findByPlatformAndExternalId(platform, repositoryId)
-            .orElseThrow(() -> new ResourceNotFoundException("REPOSITORY_NOT_FOUND", "Repository was not found."));
+            .orElseThrow(RepositoryNotFoundException::new);
 
-        if (!repository.getOwnerKey().equals(connection.accountLogin())) {
-            throw new ResourceNotFoundException("REPOSITORY_NOT_FOUND", "Repository was not found.");
+        if (!repository.getOwnerKey().equals(accountLogin)) {
+            throw new RepositoryNotFoundException();
         }
 
         return repository;
@@ -117,10 +86,6 @@ public class RepositoryService {
                     )
                 )
             );
-    }
-
-    private String resourceKey(PlatformType platform, String repositoryId) {
-        return platform.name() + ":" + repositoryId;
     }
 
     private RepositoryResponse toResponse(RepositoryCache repository) {

@@ -3,11 +3,14 @@ plugins {
 }
 
 dependencies {
+	api project(':comment')
+	api project(':connection')
+	api project(':issue')
 	api project(':platform')
-
-	implementation project(':shared-kernel')
+	api project(':repository')
+	api project(':shared-kernel')
 
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
 }

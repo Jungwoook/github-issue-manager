@@ -1,159 +1,197 @@
 # GitHub Issue Manager
 
-GitHub 이슈 관리로 시작했지만, 장기적으로는 GitLab 등 다른 플랫폼까지 확장할 수 있도록 백엔드 공통화 구조를 설계한 프로젝트입니다.
+GitHub Issue Manager는 GitHub 저장소, 이슈, 댓글을 조회하고 관리하는 웹 애플리케이션이다. 기능 자체는 GitHub 이슈 관리에서 출발했지만, 프로젝트의 핵심은 외부 플랫폼 API 의존성을 백엔드 모듈 경계 뒤로 격리한 구조 개선 과정에 있다.
 
-## 1. 프로젝트 소개
+현재 기본 사용 플랫폼은 GitHub다. 백엔드는 `platform`, `connection`, `repository`, `issue`, `comment` 모듈로 책임을 나누고, API는 `/api/platforms/{platform}/...` 형식의 플랫폼 공통 경로를 사용한다.
 
-- GitHub 저장소, 이슈, 댓글을 조회·수정하는 프로젝트
-- 단순 CRUD보다 `플랫폼 API 비종속 구조` 설계에 초점
-- 현재는 GitHub 연동만 구현
-- 백엔드는 이후 GitLab 같은 플랫폼 확장을 고려해 설계
+## 1. 프로젝트 핵심
 
 | 항목 | 내용 |
 | --- | --- |
-| 프로젝트 성격 | 개인 백엔드 중심 프로젝트 |
-| 현재 연동 플랫폼 | GitHub |
-| 핵심 목표 | GitHub 전용 구현 → 플랫폼 공통 구조로 전환 |
-| 강조 포인트 | 기능 구현보다 구조 개선과 리팩토링 과정 |
+| 프로젝트 성격 | 개인 백엔드 중심 포트폴리오 프로젝트 |
+| 기본 플랫폼 | GitHub |
+| 핵심 주제 | 외부 플랫폼 의존성 격리와 모듈 경계 설계 |
+| 백엔드 구조 | Spring Boot + Gradle 멀티 모듈 |
+| 프론트 구조 | React + Vite |
+| 인증 방식 | 사용자 제공 PAT 검증 + 서버 세션 |
 
-## 2. 프로젝트를 시작한 이유
+이 프로젝트는 단순 CRUD 앱보다 다음 질문에 초점을 둔다.
 
-- 이슈는 작업 단위이면서 동시에 플랫폼 종속 데이터라는 점에 주목
-- GitHub 중심으로 시작하더라도 구조까지 GitHub 전용으로 굳히고 싶지 않았음
-- 한 프로젝트 안에서 아래 내용을 함께 정리하고 싶었음
-- GitHub API 연동 경험
-- PAT 기반 인증 처리
-- Spring Boot REST API 설계
-- 프론트/백엔드 분리 배포 경험
-- 구현을 진행할수록 핵심 학습 포인트가 기능보다 구조 문제라는 점이 분명해짐
-- 결론: "GitHub 이슈 관리 앱"보다 "확장 가능한 플랫폼 연동 백엔드"가 더 중요한 주제가 됨
+- GitHub API 상세를 업무 서비스가 직접 알지 않게 하려면 어떻게 나눌 것인가
+- PAT 저장, 검증, 원격 호출 책임을 어디에 둘 것인가
+- 저장소, 이슈, 댓글 캐시의 소유권을 어떻게 분리할 것인가
+- 모듈 경계를 문서뿐 아니라 테스트로 어떻게 고정할 것인가
 
-## 3. 문제 정의
+## 2. 주요 기능
 
-- 초기 구조는 GitHub 전용 구현에 강하게 결합
-- 인증 엔티티, API 클라이언트, 캐시 필드명, 서비스 계층이 모두 GitHub 중심
-- 빠른 구현에는 유리했지만 확장성과 유지보수성에 한계 존재
+- 플랫폼 PAT 등록, 연결 상태 조회, 연결 해제
+- 세션 기반 현재 사용자 조회와 로그아웃
+- 저장소 목록 조회와 원격 새로고침
+- 저장소별 이슈 목록 조회, 상세 조회, 생성, 수정, 닫기
+- 이슈 댓글 조회, 새로고침, 작성
+- 저장소, 이슈, 댓글 동기화 상태 조회
 
-| 문제 | 설명 |
-| --- | --- |
-| 서비스 결합도 | 서비스 계층이 GitHub 구현 세부사항을 직접 앎 |
-| 식별자 고정 | `githubRepositoryId`, `githubIssueId` 같은 이름이 모델에 고정 |
-| 확장 비용 증가 | GitLab 등 추가 시 기능 추가보다 구조 변경 비용이 커짐 |
-| 계약 전파 범위 | 프론트/백엔드가 GitHub 전용 명세를 함께 공유 |
+현재 범위에서 OAuth / GitHub App, 라벨, 담당자, 우선순위, 마일스톤, sub-issue는 제외했다.
 
-- 핵심 문제: GitHub CRUD 구현 자체보다 `외부 플랫폼 의존성을 어떻게 격리할 것인가`
-
-## 4. 해결 전략
-
-- 한 번에 뒤엎지 않고, 기존 GitHub 흐름을 유지한 상태로 점진적 리팩토링 진행
-- 백엔드에 공통 포트 계층 도입
-- 서비스 계층의 의존 방향을 GitHub 구현체에서 공통 인터페이스로 전환
-
-| 전략 요소 | 역할 |
-| --- | --- |
-| `PlatformType` | 플랫폼 종류 일반화 |
-| `Remote*` DTO | 외부 리소스 응답 모델 일반화 |
-| `PlatformGateway` | 플랫폼 API 연동 포트 |
-| Resolver 구조 | 플랫폼별 구현체 선택 |
-
-- 핵심 원칙
-- 서비스는 GitHub API 클라이언트가 아니라 공통 게이트웨이에 의존
-- 외부 리소스 식별은 장기적으로 `platform + externalId` 구조로 전환
-- 개인 프로젝트 특성상 완성형 추상화보다 `구현 복잡도와 학습 효과의 균형`을 우선
-
-## 5. 시스템 아키텍처
-
-- 프론트와 백엔드를 분리한 구조
-- 프론트: 화면, 라우팅, 서버 상태 조회
-- 백엔드: 인증 검증, 세션 처리, 외부 API 호출, 캐시 관리, 도메인 로직
+## 3. 아키텍처
 
 ```mermaid
-flowchart LR
-    U["사용자"] --> F["Frontend\nReact + Vite"]
-    F --> B["Backend API\nSpring Boot"]
-    B --> S["Session / Internal DB"]
-    B --> G["Platform Gateway"]
-    G --> GH["GitHub REST API"]
-    G -. 확장 가능 .-> GL["GitLab 등 [추후 보완]"]
+flowchart TD
+    Frontend["Frontend\nReact + Vite"]
+    App["app\nHTTP / bootstrapping"]
+    Platform["platform\nremote API / adapter"]
+    Connection["connection\ncredential / session"]
+    Repository["repository\nrepository cache"]
+    Issue["issue\nissue cache"]
+    Comment["comment\ncomment cache"]
+    Shared["shared-kernel\nsync / common"]
+    Remote["GitHub REST API"]
+
+    Frontend --> App
+    App --> Platform
+    App --> Connection
+    App --> Repository
+    App --> Issue
+    App --> Comment
+    App --> Shared
+
+    Repository --> Platform
+    Repository --> Shared
+    Issue --> Repository
+    Issue --> Platform
+    Issue --> Shared
+    Comment --> Issue
+    Comment --> Repository
+    Comment --> Platform
+    Comment --> Shared
+    Platform --> Connection
+    Platform --> Shared
+    Platform --> Remote
 ```
 
-| 계층 | 역할 |
-| --- | --- |
-| `controller` | HTTP 요청/응답 처리 |
-| `service` | 유스케이스, 동기화 흐름 처리 |
-| `repository` | 내부 DB 접근 |
-| `core/platform` | 공통 포트, 타입, 리졸버 |
-| `github` | GitHub 전용 게이트웨이와 매핑 |
+모듈 책임은 다음과 같다.
 
-- 현재 실제 연동은 GitHub만 지원
-- 아키텍처의 핵심은 `서비스 계층이 GitHub API 상세를 직접 알지 않도록 분리`한 점
+- `app`: controller, exception handler, 실행 조립
+- `platform`: credential 검증, 원격 API 호출, GitHub/GitLab adapter 선택
+- `connection`: 사용자, 플랫폼 연결, PAT 암호화, 세션 상태
+- `repository`: 저장소 캐시, 저장소 refresh, 저장소 접근 확인
+- `issue`: 이슈 캐시, 이슈 조회/생성/수정/닫기
+- `comment`: 댓글 캐시, 댓글 조회/작성
+- `shared-kernel`: 동기화 상태, 공통 예외, 공통 응답 DTO
 
-## 6. 주요 기능
+## 4. 구조 개선 요약
 
-| 구분 | 구현 내용 |
-| --- | --- |
-| 인증 | GitHub PAT 등록, 연결 상태 확인, 연결 해제 |
-| 세션 | PAT 검증 후 세션 기반 연결 상태 유지 |
-| 저장소 | 접근 가능한 저장소 목록 조회, 새로고침 |
-| 이슈 | 목록 조회, 상세 조회, 생성, 수정, 닫기 |
-| 댓글 | 댓글 조회, 작성 |
-| 동기화 | 외부 데이터 캐시 및 재동기화 흐름 지원 |
+초기 구현은 GitHub API client, GitHub 식별자, PAT 처리 흐름이 서비스와 캐시 모델 전반에 퍼진 구조였다. 기능 구현은 빠르게 가능했지만, GitLab 같은 다른 플랫폼을 붙이려면 기능 추가보다 구조 수정 비용이 먼저 커지는 문제가 있었다.
 
-- 현재 범위는 GitHub 중심 기능에 한정
-- 미구현 항목
-- GitLab 실제 연동
-- GitHub App / OAuth 인증
-- 마일스톤, 라벨, 우선순위 정책
-- 다중 플랫폼 UI
+현재 구조에서는 다음 방식으로 책임을 분리했다.
 
-## 7. 기술 스택
+- 외부 플랫폼 응답은 platform 모듈에서 `Remote*` 모델로 변환
+- PAT 검증은 platform, 저장과 암호화는 connection이 담당
+- repository / issue / comment는 token, baseUrl, adapter 구현을 직접 알지 않음
+- 외부 리소스는 `platform + externalId` 기준으로 저장
+- 모듈 의존 방향과 금지 import는 테스트로 검증
+
+변화 과정은 [04-architecture-transition-history.md](docs/04-architecture-transition-history.md)에 따로 정리했다.
+
+## 5. 기술 스택
 
 | 영역 | 기술 |
 | --- | --- |
 | Backend | Java 17, Spring Boot, Spring MVC, Spring Data JPA, Validation |
+| Backend Build | Gradle 멀티 모듈 |
 | Database | H2 |
 | Frontend | React 19, TypeScript, Vite, React Router, TanStack Query |
-| Infra | AWS EC2, 프론트 별도 배포 |
 | External API | GitHub REST API |
-| Auth/Session | PAT 검증 + 서버 세션 |
+| Auth / Session | PAT 검증 + 서버 세션 |
+| CI / Deploy | GitHub Actions, EC2 backend deploy |
 
-## 8. 기술 선택 이유
+## 6. 실행 방법
 
-| 선택 | 이유 | 비교 관점 |
-| --- | --- | --- |
-| Spring Boot | 계층 분리, 세션 처리, JPA 모델링에 적합 | Node.js/NestJS도 가능하지만 이번 프로젝트는 객체 모델과 백엔드 설계 훈련에 더 집중 |
-| PAT 기반 인증 | 구현 복잡도를 통제하면서 인증 검증·저장·세션 연계를 학습 가능 | OAuth/GitHub App은 더 실전적이지만 초기 비용이 큼 |
-| 서버 세션 유지 | 프론트가 매 요청마다 토큰을 들고 다니지 않도록 단순화 | 완전한 해법은 아니지만 현재 범위에서 복잡도 대비 효율적 |
-| 공통 포트/게이트웨이 | GitHub 전용 구조가 서비스와 데이터 모델을 잠식하는 문제 완화 | 단순 인터페이스 분리보다 확장 가능한 구조 확보에 유리 |
-| EC2 백엔드 + 프론트 별도 배포 | 런타임 설정과 정적 프론트 배포를 분리 관리 가능 | 배포 지점은 늘지만 운영 구조를 더 명확히 이해 가능 |
+### Backend
 
-## 9. 트러블슈팅
+```powershell
+cd backend
+.\gradlew.bat :app:bootRun
+```
 
-| 문제 | 원인 | 해결 | 결과 |
-| --- | --- | --- | --- |
-| GitHub 전용 식별자가 모델 전반에 확산 | 초기 구현 속도를 우선하며 GitHub 중심 이름 사용 | `Remote*` DTO와 공통 포트 우선 도입 | 현재 기능 유지 + 일반화 가능한 기반 확보 |
-| 공통화 과정에서 기존 흐름이 깨질 위험 | 프론트/백엔드가 GitHub 전용 계약 공유 | 백엔드 공통화 → 계약 안정화 → 프론트 정리 순서로 분리 | 중간 단계마다 동작 유지 가능 |
-| PAT 처리와 운영 설정 관리 부담 | 인증 정보가 기능보다 먼저 안전하게 다뤄져야 함 | 검증 후 저장, 암호화 키·CORS를 환경 변수로 분리 | 기능 구현과 운영 안전성 기준을 함께 확보 |
+기본 실행 주소는 `http://localhost:8080`이다.
 
-## 10. 향후 개선 방향
+### Frontend
 
-- GitHub 전용 캐시 모델을 `platform + externalId` 기준으로 완전 전환
-- GitLab 어댑터 추가로 공통 게이트웨이 구조 검증
-- PAT 외 OAuth 또는 GitHub App 방식 비교·확장
-- H2에서 운영용 DB로 전환, 마이그레이션 체계 정리
-- 캐시 동기화 정책과 예외 복구 전략 고도화
-- 프론트 라우트와 화면 명명도 플랫폼 공통 구조로 정리
-- 배포 URL, 시연 방식, 운영 구성 상세 문서화 `[추후 보완]`
+```powershell
+cd frontend
+npm install
+npm run dev
+```
 
-## 11. 회고
+기본 실행 주소는 `http://localhost:5173`이다.
 
-- 시작점: GitHub 이슈 기능을 빠르게 구현하는 프로젝트
-- 전환점: 기능이 늘수록 GitHub 전용 구조의 한계가 분명해짐
-- 핵심 학습: 기능 추가보다 `외부 플랫폼 의존성을 어떻게 격리할 것인가`가 더 중요했음
-- 현재 의미
-- 단순 GitHub CRUD 프로젝트에 머무르지 않음
-- GitHub 전용 구조를 공통 포트/게이트웨이 구조로 옮겨 가는 과정을 보여 줌
-- 현재 한계
-- 아직 GitLab 같은 다른 플랫폼을 실제로 붙인 단계는 아님
-- 공통화 구조의 방향성과 기반을 먼저 확보한 상태
-- 남은 과제: 다음 플랫폼을 붙일 때 수정 범위를 실제로 줄일 수 있는지 검증
+프론트는 `.env` 또는 `.env.example` 기준으로 백엔드 API 주소를 사용한다.
+
+```text
+VITE_API_BASE_URL=http://localhost:8080/api
+```
+
+## 7. 환경 변수
+
+운영 환경 기준 주요 변수는 다음과 같다.
+
+| 변수 | 설명 |
+| --- | --- |
+| `APP_CORS_ALLOWED_ORIGINS` | 허용할 프론트 Origin |
+| `GITHUB_PAT_ENCRYPTION_KEY` | PAT 암호화 키 |
+| `GITHUB_API_BASE_URL` | GitHub API base URL |
+| `GITLAB_API_BASE_URL` | GitLab API base URL |
+
+로컬 개발 기본값은 `backend/app/src/main/resources/application.yaml`에 정의되어 있다. 운영 환경에서는 암호화 키를 반드시 별도 값으로 설정해야 한다.
+
+## 8. 검증
+
+### Backend
+
+```powershell
+cd backend
+.\gradlew.bat test
+```
+
+백엔드 테스트에는 다음 구조 검증이 포함된다.
+
+- Gradle 모듈 의존 방향
+- app 모듈의 public API 의존 제한
+- public API 패키지의 타 모듈 internal import 차단
+- repository / issue / comment의 connection 직접 의존 차단
+- 모듈별 Spring/JPA configuration과 entity scan 확인
+
+### Frontend
+
+```powershell
+cd frontend
+npm run build
+```
+
+## 9. 문서
+
+현재 루트 문서는 최종 설명용이고, 과거 설계 초안은 `docs/archive/`에 보관한다. 학습용 리뷰 문서와 작업 기록은 `docs/review`, `docs/claude`, `docs/task`에 유지한다.
+
+| 문서 | 내용 |
+| --- | --- |
+| [01-prd.md](docs/01-prd.md) | 제품 범위와 목표 |
+| [02-implementation-summary.md](docs/02-implementation-summary.md) | 현재 구현 요약 |
+| [03-architecture.md](docs/03-architecture.md) | 현재 아키텍처 |
+| [04-architecture-transition-history.md](docs/04-architecture-transition-history.md) | 구조 변화 과정 |
+| [05-platform-module-service-structure.md](docs/05-platform-module-service-structure.md) | 모듈별 책임 |
+| [06-data-model.md](docs/06-data-model.md) | 데이터 모델 |
+| [07-api-spec.md](docs/07-api-spec.md) | API 명세 |
+| [08-pat-management-flow.md](docs/08-pat-management-flow.md) | PAT 관리 흐름 |
+| [09-core-use-cases.md](docs/09-core-use-cases.md) | 핵심 유스케이스 |
+| [10-main-use-case-flow.md](docs/10-main-use-case-flow.md) | 메인 사용 흐름 |
+| [11-use-case-sequence-diagrams.md](docs/11-use-case-sequence-diagrams.md) | 유스케이스 시퀀스 |
+| [12-prod-runtime-config.md](docs/12-prod-runtime-config.md) | 운영 설정 |
+
+## 10. 현재 한계
+
+- 기본 사용 흐름은 GitHub 기준이다.
+- GitLab 실제 운영 사용성은 현재 포트폴리오 범위 밖이다.
+- OAuth / GitHub App 기반 인증은 구현하지 않았다.
+- 운영 DB 전환과 마이그레이션 체계는 별도 후속 과제다.
+- 프론트 구조 공통화는 백엔드 계약 안정화 이후의 후속 후보로 둔다.
