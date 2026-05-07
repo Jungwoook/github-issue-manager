@@ -5,7 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 @Configuration
-@EntityScan(basePackages = "com.jw.github_issue_manager.application.sync")
-@EnableJpaRepositories(basePackages = "com.jw.github_issue_manager.application.sync")
+@EntityScan(basePackages = "com.jw.github_issue_manager.application")
+@EnableJpaRepositories(basePackages = "com.jw.github_issue_manager.application")
 public class ApplicationSyncConfig {
 }

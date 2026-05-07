@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.client.RestClientResponseException;
 
+import com.jw.github_issue_manager.application.sync.SyncOperationFailedException;
 import com.jw.github_issue_manager.comment.api.CommentNotFoundException;
 import com.jw.github_issue_manager.github.GitHubApiException;
 import com.jw.github_issue_manager.gitlab.GitLabApiException;
@@ -72,6 +73,21 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handlePlatformApi(RuntimeException exception) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
             .body(ErrorResponse.of(PLATFORM_API_ERROR, exception.getMessage()));
+    }
+
+    @ExceptionHandler(SyncOperationFailedException.class)
+    public ResponseEntity<SyncFailureErrorResponse> handleSyncOperationFailed(SyncOperationFailedException exception) {
+        HttpStatus status = "RATE_LIMITED".equals(exception.getStatus()) ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.BAD_GATEWAY;
+        return ResponseEntity.status(status)
+            .body(SyncFailureErrorResponse.of(
+                "SYNC_OPERATION_FAILED",
+                exception.getMessage(),
+                exception.getSyncRunId(),
+                exception.getFailureId(),
+                exception.getStatus(),
+                exception.isRetryable(),
+                exception.getNextRetryAt()
+            ));
     }
 
     @ExceptionHandler(PlatformIntegrationException.class)

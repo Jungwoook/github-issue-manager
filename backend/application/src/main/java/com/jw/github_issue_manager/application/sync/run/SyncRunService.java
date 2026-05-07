@@ -34,6 +34,12 @@ public class SyncRunService {
         return syncRunRepository.save(syncRun);
     }
 
+    @Transactional
+    public SyncRun completeRateLimited(SyncRun syncRun, String message) {
+        syncRun.complete(SyncRunStatus.RATE_LIMITED, 0, 0, 0, 1, message);
+        return syncRunRepository.save(syncRun);
+    }
+
     @Transactional(readOnly = true)
     public List<SyncRunResponse> getRecentRuns() {
         return syncRunRepository.findTop50ByOrderByStartedAtDesc().stream()

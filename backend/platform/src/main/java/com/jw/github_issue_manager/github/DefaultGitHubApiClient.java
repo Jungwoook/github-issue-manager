@@ -1,18 +1,23 @@
 package com.jw.github_issue_manager.github;
 
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.jw.github_issue_manager.core.platform.PlatformType;
+import com.jw.github_issue_manager.core.platform.RateLimitSnapshot;
 
 @Component
 public class DefaultGitHubApiClient implements GitHubApiClient {
@@ -39,16 +44,22 @@ public class DefaultGitHubApiClient implements GitHubApiClient {
 
     @Override
     public List<GitHubRepositoryInfo> getAccessibleRepositories(String personalAccessToken) {
+        return getAccessibleRepositoriesWithRateLimit(personalAccessToken).data();
+    }
+
+    @Override
+    public GitHubApiResult<List<GitHubRepositoryInfo>> getAccessibleRepositoriesWithRateLimit(String personalAccessToken) {
         String uri = UriComponentsBuilder.fromUriString(properties.apiBaseUrl() + "/user/repos")
             .queryParam("visibility", "all")
             .queryParam("affiliation", "owner,collaborator,organization_member")
             .queryParam("per_page", "100")
             .toUriString();
-        RepositoryResponse[] response = apiRequestAbsolute(uri, personalAccessToken, RepositoryResponse[].class);
+        ResponseEntity<RepositoryResponse[]> entity = apiRequestAbsoluteEntity(uri, personalAccessToken, RepositoryResponse[].class);
+        RepositoryResponse[] response = entity.getBody();
         if (response == null) {
-            return List.of();
+            return new GitHubApiResult<>(List.of(), toRateLimitSnapshot(entity.getHeaders(), "core"));
         }
-        return List.of(response).stream()
+        List<GitHubRepositoryInfo> repositories = List.of(response).stream()
             .map(repository -> new GitHubRepositoryInfo(
                 repository.id(),
                 repository.owner().login(),
@@ -61,21 +72,29 @@ public class DefaultGitHubApiClient implements GitHubApiClient {
                 toLocalDateTime(repository.pushedAt())
             ))
             .toList();
+        return new GitHubApiResult<>(repositories, toRateLimitSnapshot(entity.getHeaders(), "core"));
     }
 
     @Override
     public List<GitHubIssueInfo> getRepositoryIssues(String personalAccessToken, String owner, String repositoryName) {
+        return getRepositoryIssuesWithRateLimit(personalAccessToken, owner, repositoryName).data();
+    }
+
+    @Override
+    public GitHubApiResult<List<GitHubIssueInfo>> getRepositoryIssuesWithRateLimit(String personalAccessToken, String owner, String repositoryName) {
         String uri = UriComponentsBuilder.fromUriString(properties.apiBaseUrl() + "/repos/" + owner + "/" + repositoryName + "/issues")
             .queryParam("state", "all")
             .toUriString();
-        GitHubIssueResponse[] response = apiRequestAbsolute(uri, personalAccessToken, GitHubIssueResponse[].class);
+        ResponseEntity<GitHubIssueResponse[]> entity = apiRequestAbsoluteEntity(uri, personalAccessToken, GitHubIssueResponse[].class);
+        GitHubIssueResponse[] response = entity.getBody();
         if (response == null) {
-            return List.of();
+            return new GitHubApiResult<>(List.of(), toRateLimitSnapshot(entity.getHeaders(), "core"));
         }
-        return List.of(response).stream()
+        List<GitHubIssueInfo> issues = List.of(response).stream()
             .filter(issue -> issue.pullRequest() == null)
             .map(this::toIssueInfo)
             .toList();
+        return new GitHubApiResult<>(issues, toRateLimitSnapshot(entity.getHeaders(), "core"));
     }
 
     @Override
@@ -148,12 +167,62 @@ public class DefaultGitHubApiClient implements GitHubApiClient {
     }
 
     private <T> T apiRequestAbsolute(String uri, String token, Class<T> responseType) {
+        return apiRequestAbsoluteEntity(uri, token, responseType).getBody();
+    }
+
+    private <T> ResponseEntity<T> apiRequestAbsoluteEntity(String uri, String token, Class<T> responseType) {
         return restClient.get()
             .uri(uri)
             .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
             .header(HttpHeaders.ACCEPT, "application/vnd.github+json")
             .retrieve()
-            .body(responseType);
+            .toEntity(responseType);
+    }
+
+    private RateLimitSnapshot toRateLimitSnapshot(HttpHeaders headers, String resource) {
+        Integer limit = parseInteger(headers.getFirst("X-RateLimit-Limit"));
+        Integer remaining = parseInteger(headers.getFirst("X-RateLimit-Remaining"));
+        Long resetEpochSecond = parseLong(headers.getFirst("X-RateLimit-Reset"));
+        Integer retryAfterSeconds = parseInteger(headers.getFirst("Retry-After"));
+        LocalDateTime resetAt = resetEpochSecond == null
+            ? null
+            : LocalDateTime.ofInstant(Instant.ofEpochSecond(resetEpochSecond), ZoneId.systemDefault());
+
+        if (limit == null && remaining == null && resetAt == null && retryAfterSeconds == null) {
+            return null;
+        }
+
+        return new RateLimitSnapshot(
+            PlatformType.GITHUB,
+            limit,
+            remaining,
+            resetAt,
+            retryAfterSeconds,
+            resource,
+            LocalDateTime.now()
+        );
+    }
+
+    private Integer parseInteger(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
+    private Long parseLong(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 
     private GitHubIssueInfo toIssueInfo(GitHubIssueResponse issue) {

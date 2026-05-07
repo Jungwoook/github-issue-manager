@@ -15,7 +15,15 @@ public interface PlatformGateway {
 
     List<RemoteRepository> getAccessibleRepositories(String accessToken, String baseUrl);
 
+    default PlatformResult<List<RemoteRepository>> getAccessibleRepositoriesWithRateLimit(String accessToken, String baseUrl) {
+        return PlatformResult.withoutSnapshot(getAccessibleRepositories(accessToken, baseUrl));
+    }
+
     List<RemoteIssue> getRepositoryIssues(String accessToken, String baseUrl, String ownerKey, String repositoryName);
+
+    default PlatformResult<List<RemoteIssue>> getRepositoryIssuesWithRateLimit(String accessToken, String baseUrl, String ownerKey, String repositoryName) {
+        return PlatformResult.withoutSnapshot(getRepositoryIssues(accessToken, baseUrl, ownerKey, repositoryName));
+    }
 
     RemoteIssue createIssue(String accessToken, String baseUrl, String ownerKey, String repositoryName, String title, String body);
 

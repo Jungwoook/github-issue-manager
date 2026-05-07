@@ -4,12 +4,16 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.jw.github_issue_manager.application.ratelimit.RateLimitService;
 import com.jw.github_issue_manager.application.sync.SyncResourceType;
 import com.jw.github_issue_manager.application.sync.SyncFailureClassifier;
+import com.jw.github_issue_manager.application.sync.SyncOperationFailedException;
 import com.jw.github_issue_manager.application.sync.SyncStateResponse;
 import com.jw.github_issue_manager.application.sync.SyncStateService;
+import com.jw.github_issue_manager.application.sync.failure.SyncFailure;
 import com.jw.github_issue_manager.application.sync.failure.SyncFailureService;
 import com.jw.github_issue_manager.application.sync.run.SyncRun;
+import com.jw.github_issue_manager.application.sync.run.SyncRunStatus;
 import com.jw.github_issue_manager.application.sync.run.SyncRunService;
 import com.jw.github_issue_manager.connection.api.PlatformConnectionFacade;
 import com.jw.github_issue_manager.connection.api.TokenAccess;
@@ -37,6 +41,7 @@ public class IssueApplicationFacade {
     private final SyncRunService syncRunService;
     private final SyncFailureService syncFailureService;
     private final SyncFailureClassifier syncFailureClassifier;
+    private final RateLimitService rateLimitService;
 
     public IssueApplicationFacade(
         IssueFacade issueFacade,
@@ -46,7 +51,8 @@ public class IssueApplicationFacade {
         SyncStateService syncStateService,
         SyncRunService syncRunService,
         SyncFailureService syncFailureService,
-        SyncFailureClassifier syncFailureClassifier
+        SyncFailureClassifier syncFailureClassifier,
+        RateLimitService rateLimitService
     ) {
         this.issueFacade = issueFacade;
         this.repositoryFacade = repositoryFacade;
@@ -56,6 +62,7 @@ public class IssueApplicationFacade {
         this.syncRunService = syncRunService;
         this.syncFailureService = syncFailureService;
         this.syncFailureClassifier = syncFailureClassifier;
+        this.rateLimitService = rateLimitService;
     }
 
     public List<IssueSummaryResponse> getIssues(
@@ -77,9 +84,10 @@ public class IssueApplicationFacade {
         String syncResourceKey = repositoryKey(platformType, repository.externalId());
         SyncRun syncRun = syncRunService.start(platformType, SyncResourceType.REPOSITORY, syncResourceKey, "MANUAL");
         try {
-            var issues = platformGatewayResolver.getGateway(platformType)
-                .getRepositoryIssues(tokenAccess.accessToken(), tokenAccess.baseUrl(), repository.ownerKey(), repository.name());
-            List<IssueSummaryResponse> responses = issueFacade.upsertIssues(platformType, repository.externalId(), issues);
+            var result = platformGatewayResolver.getGateway(platformType)
+                .getRepositoryIssuesWithRateLimit(tokenAccess.accessToken(), tokenAccess.baseUrl(), repository.ownerKey(), repository.name());
+            rateLimitService.record(result.rateLimitSnapshot());
+            List<IssueSummaryResponse> responses = issueFacade.upsertIssues(platformType, repository.externalId(), result.data());
 
             syncRunService.completeSuccess(syncRun, responses.size());
             syncStateService.recordSuccess(
@@ -90,8 +98,7 @@ public class IssueApplicationFacade {
 
             return responses;
         } catch (RuntimeException exception) {
-            recordFailure(syncRun, "REFRESH_ISSUES", exception);
-            throw exception;
+            throw recordFailure(syncRun, "REFRESH_ISSUES", exception);
         }
     }
 
@@ -208,18 +215,33 @@ public class IssueApplicationFacade {
         return platform.name() + ":" + repositoryId + ":" + issueNumberOrKey;
     }
 
-    private void recordFailure(SyncRun syncRun, String operation, RuntimeException exception) {
+    private SyncOperationFailedException recordFailure(SyncRun syncRun, String operation, RuntimeException exception) {
         var failureType = syncFailureClassifier.classify(exception);
         String message = syncFailureClassifier.message(exception);
-        syncRunService.completeFailed(syncRun, message);
-        syncFailureService.recordFailure(
+        boolean retryable = syncFailureClassifier.isRetryable(failureType);
+        var status = failureType.name().equals("RATE_LIMITED") ? SyncRunStatus.RATE_LIMITED : SyncRunStatus.FAILED;
+        if (status == SyncRunStatus.RATE_LIMITED) {
+            syncRunService.completeRateLimited(syncRun, message);
+        } else {
+            syncRunService.completeFailed(syncRun, message);
+        }
+        SyncFailure failure = syncFailureService.recordFailure(
             syncRun,
             operation,
             failureType,
-            syncFailureClassifier.isRetryable(failureType),
-            null,
+            retryable,
+            syncFailureClassifier.nextRetryAt(exception),
             message
         );
         syncStateService.recordFailure(syncRun.getResourceType(), syncRun.getResourceKey(), message);
+        return new SyncOperationFailedException(
+            message,
+            syncRun.getId(),
+            failure.getId(),
+            status.name(),
+            retryable,
+            failure.getNextRetryAt(),
+            exception
+        );
     }
 }
