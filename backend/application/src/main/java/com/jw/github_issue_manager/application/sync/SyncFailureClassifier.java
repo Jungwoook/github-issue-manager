@@ -58,8 +58,7 @@ public class SyncFailureClassifier {
     public boolean isRetryable(SyncFailureType type) {
         return type == SyncFailureType.NETWORK_ERROR
             || type == SyncFailureType.TEMPORARY_UNAVAILABLE
-            || type == SyncFailureType.RATE_LIMITED
-            || type == SyncFailureType.UNKNOWN;
+            || type == SyncFailureType.RATE_LIMITED;
     }
 
     public String message(RuntimeException exception) {

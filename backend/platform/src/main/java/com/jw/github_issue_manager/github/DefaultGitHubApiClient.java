@@ -84,6 +84,7 @@ public class DefaultGitHubApiClient implements GitHubApiClient {
     public GitHubApiResult<List<GitHubIssueInfo>> getRepositoryIssuesWithRateLimit(String personalAccessToken, String owner, String repositoryName) {
         String uri = UriComponentsBuilder.fromUriString(properties.apiBaseUrl() + "/repos/" + owner + "/" + repositoryName + "/issues")
             .queryParam("state", "all")
+            .queryParam("per_page", "100")
             .toUriString();
         ResponseEntity<GitHubIssueResponse[]> entity = apiRequestAbsoluteEntity(uri, personalAccessToken, GitHubIssueResponse[].class);
         GitHubIssueResponse[] response = entity.getBody();
@@ -95,6 +96,18 @@ public class DefaultGitHubApiClient implements GitHubApiClient {
             .map(this::toIssueInfo)
             .toList();
         return new GitHubApiResult<>(issues, toRateLimitSnapshot(entity.getHeaders(), "core"));
+    }
+
+    @Override
+    public GitHubApiResult<GitHubIssueInfo> getRepositoryIssueWithRateLimit(
+        String personalAccessToken,
+        String owner,
+        String repositoryName,
+        int issueNumber
+    ) {
+        String uri = properties.apiBaseUrl() + "/repos/" + owner + "/" + repositoryName + "/issues/" + issueNumber;
+        ResponseEntity<GitHubIssueResponse> entity = apiRequestAbsoluteEntity(uri, personalAccessToken, GitHubIssueResponse.class);
+        return new GitHubApiResult<>(toIssueInfo(entity.getBody()), toRateLimitSnapshot(entity.getHeaders(), "core"));
     }
 
     @Override

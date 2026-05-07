@@ -18,6 +18,21 @@ public interface GitHubApiClient {
         return new GitHubApiResult<>(getRepositoryIssues(personalAccessToken, owner, repositoryName), null);
     }
 
+    default GitHubApiResult<GitHubIssueInfo> getRepositoryIssueWithRateLimit(
+        String personalAccessToken,
+        String owner,
+        String repositoryName,
+        int issueNumber
+    ) {
+        return new GitHubApiResult<>(
+            getRepositoryIssues(personalAccessToken, owner, repositoryName).stream()
+                .filter(issue -> issue.number() == issueNumber)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("GitHub issue not found: " + issueNumber)),
+            null
+        );
+    }
+
     GitHubIssueInfo createIssue(String personalAccessToken, String owner, String repositoryName, String title, String body);
 
     GitHubIssueInfo updateIssue(String personalAccessToken, String owner, String repositoryName, int issueNumber, String title, String body, String state);

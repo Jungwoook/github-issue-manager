@@ -25,6 +25,19 @@ public interface PlatformGateway {
         return PlatformResult.withoutSnapshot(getRepositoryIssues(accessToken, baseUrl, ownerKey, repositoryName));
     }
 
+    default PlatformResult<RemoteIssue> getRepositoryIssueWithRateLimit(
+        String accessToken,
+        String baseUrl,
+        String ownerKey,
+        String repositoryName,
+        String issueKey
+    ) {
+        return PlatformResult.withoutSnapshot(getRepositoryIssues(accessToken, baseUrl, ownerKey, repositoryName).stream()
+            .filter(issue -> issueKey.equals(issue.numberOrKey()))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Remote issue not found: " + issueKey)));
+    }
+
     RemoteIssue createIssue(String accessToken, String baseUrl, String ownerKey, String repositoryName, String title, String body);
 
     RemoteIssue updateIssue(

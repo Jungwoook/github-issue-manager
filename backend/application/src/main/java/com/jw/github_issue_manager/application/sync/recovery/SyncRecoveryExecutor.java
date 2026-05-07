@@ -1,7 +1,5 @@
 package com.jw.github_issue_manager.application.sync.recovery;
 
-import java.util.List;
-
 import org.springframework.stereotype.Component;
 
 import com.jw.github_issue_manager.application.ratelimit.RateLimitService;
@@ -21,7 +19,6 @@ import com.jw.github_issue_manager.connection.api.PlatformConnectionFacade;
 import com.jw.github_issue_manager.connection.api.TokenAccess;
 import com.jw.github_issue_manager.core.platform.PlatformGatewayResolver;
 import com.jw.github_issue_manager.core.platform.PlatformType;
-import com.jw.github_issue_manager.core.remote.RemoteIssue;
 import com.jw.github_issue_manager.issue.api.IssueFacade;
 import com.jw.github_issue_manager.repository.api.RepositoryAccess;
 import com.jw.github_issue_manager.repository.api.RepositoryFacade;
@@ -109,10 +106,15 @@ class SyncRecoveryExecutor {
         SyncRun syncRun = syncRunService.start(platform, SyncResourceType.ISSUE, resourceKey, "MANUAL_RESYNC");
         try {
             var result = platformGatewayResolver.getGateway(platform)
-                .getRepositoryIssuesWithRateLimit(tokenAccess.accessToken(), tokenAccess.baseUrl(), repository.ownerKey(), repository.name());
+                .getRepositoryIssueWithRateLimit(
+                    tokenAccess.accessToken(),
+                    tokenAccess.baseUrl(),
+                    repository.ownerKey(),
+                    repository.name(),
+                    issueNumberOrKey
+                );
             rateLimitService.record(result.rateLimitSnapshot());
-            RemoteIssue target = findIssue(result.data(), issueNumberOrKey);
-            var issue = issueFacade.upsertIssue(platform, repository.externalId(), target);
+            var issue = issueFacade.upsertIssue(platform, repository.externalId(), result.data());
             int updatedCount = 1;
             if (includeComments) {
                 var comments = platformGatewayResolver.getGateway(platform)
@@ -131,13 +133,6 @@ class SyncRecoveryExecutor {
     private RepositoryAccess requireRepository(PlatformType platform, String repositoryId, HttpSession session) {
         CurrentConnection connection = platformConnectionFacade.requireCurrentConnection(platform, session);
         return repositoryFacade.requireAccessibleRepository(platform, repositoryId, connection.accountLogin());
-    }
-
-    private RemoteIssue findIssue(List<RemoteIssue> issues, String issueNumberOrKey) {
-        return issues.stream()
-            .filter(issue -> issueNumberOrKey.equals(issue.numberOrKey()))
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("Remote issue not found: " + issueNumberOrKey));
     }
 
     private SyncOperationFailedException recordFailure(SyncRun syncRun, String operation, RuntimeException exception) {

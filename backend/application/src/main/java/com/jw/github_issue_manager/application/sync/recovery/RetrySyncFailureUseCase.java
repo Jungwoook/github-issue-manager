@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 import org.springframework.stereotype.Service;
 
+import com.jw.github_issue_manager.application.sync.SyncOperationFailedException;
 import com.jw.github_issue_manager.application.sync.failure.SyncFailure;
 import com.jw.github_issue_manager.application.sync.failure.SyncFailureService;
 import com.jw.github_issue_manager.application.sync.run.SyncRunResponse;
@@ -29,29 +30,33 @@ public class RetrySyncFailureUseCase {
         SyncFailure failure = syncFailureService.requireFailure(failureId);
         validateRetryable(failure);
 
-        SyncRunResponse response = switch (failure.getOperation()) {
-            case "REFRESH_REPOSITORIES" -> syncRecoveryExecutor.refreshRepositories(
-                failure.getPlatform(),
-                session,
-                "MANUAL_RETRY",
-                "RETRY_REFRESH_REPOSITORIES"
-            );
-            case "REFRESH_ISSUES", "RESYNC_REPOSITORY" -> syncRecoveryExecutor.refreshRepositoryIssues(
-                failure.getPlatform(),
-                repositoryId(failure.getPlatform(), failure.getResourceKey()),
-                session,
-                "MANUAL_RETRY",
-                "RETRY_REFRESH_ISSUES"
-            );
-            case "RESYNC_ISSUE" -> {
-                String[] parts = resourceParts(failure.getPlatform(), failure.getResourceKey(), 2);
-                yield syncRecoveryExecutor.refreshIssue(failure.getPlatform(), parts[0], parts[1], false, session);
-            }
-            default -> throw new IllegalArgumentException("Unsupported retry operation: " + failure.getOperation());
-        };
-
-        syncFailureService.markResolved(failure);
-        return response;
+        try {
+            SyncRunResponse response = switch (failure.getOperation()) {
+                case "REFRESH_REPOSITORIES" -> syncRecoveryExecutor.refreshRepositories(
+                    failure.getPlatform(),
+                    session,
+                    "MANUAL_RETRY",
+                    "RETRY_REFRESH_REPOSITORIES"
+                );
+                case "REFRESH_ISSUES", "RESYNC_REPOSITORY" -> syncRecoveryExecutor.refreshRepositoryIssues(
+                    failure.getPlatform(),
+                    repositoryId(failure.getPlatform(), failure.getResourceKey()),
+                    session,
+                    "MANUAL_RETRY",
+                    "RETRY_REFRESH_ISSUES"
+                );
+                case "RESYNC_ISSUE" -> {
+                    String[] parts = resourceParts(failure.getPlatform(), failure.getResourceKey(), 2);
+                    yield syncRecoveryExecutor.refreshIssue(failure.getPlatform(), parts[0], parts[1], false, session);
+                }
+                default -> throw new IllegalArgumentException("Unsupported retry operation: " + failure.getOperation());
+            };
+            syncFailureService.markResolved(failure);
+            return response;
+        } catch (SyncOperationFailedException exception) {
+            syncFailureService.recordRetryFailure(failure, exception.getNextRetryAt(), exception.getMessage());
+            throw exception;
+        }
     }
 
     private void validateRetryable(SyncFailure failure) {

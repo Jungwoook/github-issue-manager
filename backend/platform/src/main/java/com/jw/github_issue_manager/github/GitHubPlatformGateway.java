@@ -72,6 +72,23 @@ public class GitHubPlatformGateway implements PlatformGateway {
     }
 
     @Override
+    public PlatformResult<RemoteIssue> getRepositoryIssueWithRateLimit(
+        String accessToken,
+        String baseUrl,
+        String ownerKey,
+        String repositoryName,
+        String issueKey
+    ) {
+        GitHubApiResult<GitHubIssueInfo> result = gitHubApiClient.getRepositoryIssueWithRateLimit(
+            accessToken,
+            ownerKey,
+            repositoryName,
+            Integer.parseInt(issueKey)
+        );
+        return new PlatformResult<>(toRemoteIssue(result.data()), result.rateLimitSnapshot());
+    }
+
+    @Override
     public RemoteIssue createIssue(String accessToken, String baseUrl, String ownerKey, String repositoryName, String title, String body) {
         return toRemoteIssue(gitHubApiClient.createIssue(accessToken, ownerKey, repositoryName, title, body));
     }
