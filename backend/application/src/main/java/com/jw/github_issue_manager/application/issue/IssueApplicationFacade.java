@@ -5,8 +5,12 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.jw.github_issue_manager.application.sync.SyncResourceType;
+import com.jw.github_issue_manager.application.sync.SyncFailureClassifier;
 import com.jw.github_issue_manager.application.sync.SyncStateResponse;
 import com.jw.github_issue_manager.application.sync.SyncStateService;
+import com.jw.github_issue_manager.application.sync.failure.SyncFailureService;
+import com.jw.github_issue_manager.application.sync.run.SyncRun;
+import com.jw.github_issue_manager.application.sync.run.SyncRunService;
 import com.jw.github_issue_manager.connection.api.PlatformConnectionFacade;
 import com.jw.github_issue_manager.connection.api.TokenAccess;
 import com.jw.github_issue_manager.core.platform.PlatformType;
@@ -30,19 +34,28 @@ public class IssueApplicationFacade {
     private final PlatformConnectionFacade platformConnectionFacade;
     private final PlatformGatewayResolver platformGatewayResolver;
     private final SyncStateService syncStateService;
+    private final SyncRunService syncRunService;
+    private final SyncFailureService syncFailureService;
+    private final SyncFailureClassifier syncFailureClassifier;
 
     public IssueApplicationFacade(
         IssueFacade issueFacade,
         RepositoryFacade repositoryFacade,
         PlatformConnectionFacade platformConnectionFacade,
         PlatformGatewayResolver platformGatewayResolver,
-        SyncStateService syncStateService
+        SyncStateService syncStateService,
+        SyncRunService syncRunService,
+        SyncFailureService syncFailureService,
+        SyncFailureClassifier syncFailureClassifier
     ) {
         this.issueFacade = issueFacade;
         this.repositoryFacade = repositoryFacade;
         this.platformConnectionFacade = platformConnectionFacade;
         this.platformGatewayResolver = platformGatewayResolver;
         this.syncStateService = syncStateService;
+        this.syncRunService = syncRunService;
+        this.syncFailureService = syncFailureService;
+        this.syncFailureClassifier = syncFailureClassifier;
     }
 
     public List<IssueSummaryResponse> getIssues(
@@ -61,17 +74,25 @@ public class IssueApplicationFacade {
         PlatformType platformType = PlatformType.from(platform);
         RepositoryAccess repository = requireRepository(platformType, repositoryId, session);
         TokenAccess tokenAccess = platformConnectionFacade.requireTokenAccess(platformType, session);
-        var issues = platformGatewayResolver.getGateway(platformType)
-            .getRepositoryIssues(tokenAccess.accessToken(), tokenAccess.baseUrl(), repository.ownerKey(), repository.name());
-        List<IssueSummaryResponse> responses = issueFacade.upsertIssues(platformType, repository.externalId(), issues);
+        String syncResourceKey = repositoryKey(platformType, repository.externalId());
+        SyncRun syncRun = syncRunService.start(platformType, SyncResourceType.REPOSITORY, syncResourceKey, "MANUAL");
+        try {
+            var issues = platformGatewayResolver.getGateway(platformType)
+                .getRepositoryIssues(tokenAccess.accessToken(), tokenAccess.baseUrl(), repository.ownerKey(), repository.name());
+            List<IssueSummaryResponse> responses = issueFacade.upsertIssues(platformType, repository.externalId(), issues);
 
-        syncStateService.recordSuccess(
-            SyncResourceType.REPOSITORY,
-            repositoryKey(platformType, repository.externalId()),
-            "Issue cache refreshed for repository."
-        );
+            syncRunService.completeSuccess(syncRun, responses.size());
+            syncStateService.recordSuccess(
+                SyncResourceType.REPOSITORY,
+                syncResourceKey,
+                "Issue cache refreshed for repository."
+            );
 
-        return responses;
+            return responses;
+        } catch (RuntimeException exception) {
+            recordFailure(syncRun, "REFRESH_ISSUES", exception);
+            throw exception;
+        }
     }
 
     public IssueDetailResponse createIssue(
@@ -185,5 +206,20 @@ public class IssueApplicationFacade {
 
     private String issueKey(PlatformType platform, String repositoryId, String issueNumberOrKey) {
         return platform.name() + ":" + repositoryId + ":" + issueNumberOrKey;
+    }
+
+    private void recordFailure(SyncRun syncRun, String operation, RuntimeException exception) {
+        var failureType = syncFailureClassifier.classify(exception);
+        String message = syncFailureClassifier.message(exception);
+        syncRunService.completeFailed(syncRun, message);
+        syncFailureService.recordFailure(
+            syncRun,
+            operation,
+            failureType,
+            syncFailureClassifier.isRetryable(failureType),
+            null,
+            message
+        );
+        syncStateService.recordFailure(syncRun.getResourceType(), syncRun.getResourceKey(), message);
     }
 }
