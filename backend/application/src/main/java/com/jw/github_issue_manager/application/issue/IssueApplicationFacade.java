@@ -4,9 +4,17 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.jw.github_issue_manager.application.ratelimit.RateLimitService;
 import com.jw.github_issue_manager.application.sync.SyncResourceType;
+import com.jw.github_issue_manager.application.sync.SyncFailureClassifier;
+import com.jw.github_issue_manager.application.sync.SyncOperationFailedException;
 import com.jw.github_issue_manager.application.sync.SyncStateResponse;
 import com.jw.github_issue_manager.application.sync.SyncStateService;
+import com.jw.github_issue_manager.application.sync.failure.SyncFailure;
+import com.jw.github_issue_manager.application.sync.failure.SyncFailureService;
+import com.jw.github_issue_manager.application.sync.run.SyncRun;
+import com.jw.github_issue_manager.application.sync.run.SyncRunStatus;
+import com.jw.github_issue_manager.application.sync.run.SyncRunService;
 import com.jw.github_issue_manager.connection.api.PlatformConnectionFacade;
 import com.jw.github_issue_manager.connection.api.TokenAccess;
 import com.jw.github_issue_manager.core.platform.PlatformType;
@@ -30,19 +38,31 @@ public class IssueApplicationFacade {
     private final PlatformConnectionFacade platformConnectionFacade;
     private final PlatformGatewayResolver platformGatewayResolver;
     private final SyncStateService syncStateService;
+    private final SyncRunService syncRunService;
+    private final SyncFailureService syncFailureService;
+    private final SyncFailureClassifier syncFailureClassifier;
+    private final RateLimitService rateLimitService;
 
     public IssueApplicationFacade(
         IssueFacade issueFacade,
         RepositoryFacade repositoryFacade,
         PlatformConnectionFacade platformConnectionFacade,
         PlatformGatewayResolver platformGatewayResolver,
-        SyncStateService syncStateService
+        SyncStateService syncStateService,
+        SyncRunService syncRunService,
+        SyncFailureService syncFailureService,
+        SyncFailureClassifier syncFailureClassifier,
+        RateLimitService rateLimitService
     ) {
         this.issueFacade = issueFacade;
         this.repositoryFacade = repositoryFacade;
         this.platformConnectionFacade = platformConnectionFacade;
         this.platformGatewayResolver = platformGatewayResolver;
         this.syncStateService = syncStateService;
+        this.syncRunService = syncRunService;
+        this.syncFailureService = syncFailureService;
+        this.syncFailureClassifier = syncFailureClassifier;
+        this.rateLimitService = rateLimitService;
     }
 
     public List<IssueSummaryResponse> getIssues(
@@ -61,17 +81,25 @@ public class IssueApplicationFacade {
         PlatformType platformType = PlatformType.from(platform);
         RepositoryAccess repository = requireRepository(platformType, repositoryId, session);
         TokenAccess tokenAccess = platformConnectionFacade.requireTokenAccess(platformType, session);
-        var issues = platformGatewayResolver.getGateway(platformType)
-            .getRepositoryIssues(tokenAccess.accessToken(), tokenAccess.baseUrl(), repository.ownerKey(), repository.name());
-        List<IssueSummaryResponse> responses = issueFacade.upsertIssues(platformType, repository.externalId(), issues);
+        String syncResourceKey = repositoryKey(platformType, repository.externalId());
+        SyncRun syncRun = syncRunService.start(platformType, SyncResourceType.REPOSITORY, syncResourceKey, "MANUAL");
+        try {
+            var result = platformGatewayResolver.getGateway(platformType)
+                .getRepositoryIssuesWithRateLimit(tokenAccess.accessToken(), tokenAccess.baseUrl(), repository.ownerKey(), repository.name());
+            rateLimitService.record(result.rateLimitSnapshot());
+            List<IssueSummaryResponse> responses = issueFacade.upsertIssues(platformType, repository.externalId(), result.data());
 
-        syncStateService.recordSuccess(
-            SyncResourceType.REPOSITORY,
-            repositoryKey(platformType, repository.externalId()),
-            "Issue cache refreshed for repository."
-        );
+            syncRunService.completeSuccess(syncRun, responses.size());
+            syncStateService.recordSuccess(
+                SyncResourceType.REPOSITORY,
+                syncResourceKey,
+                "Issue cache refreshed for repository."
+            );
 
-        return responses;
+            return responses;
+        } catch (RuntimeException exception) {
+            throw recordFailure(syncRun, "REFRESH_ISSUES", exception);
+        }
     }
 
     public IssueDetailResponse createIssue(
@@ -185,5 +213,35 @@ public class IssueApplicationFacade {
 
     private String issueKey(PlatformType platform, String repositoryId, String issueNumberOrKey) {
         return platform.name() + ":" + repositoryId + ":" + issueNumberOrKey;
+    }
+
+    private SyncOperationFailedException recordFailure(SyncRun syncRun, String operation, RuntimeException exception) {
+        var failureType = syncFailureClassifier.classify(exception);
+        String message = syncFailureClassifier.message(exception);
+        boolean retryable = syncFailureClassifier.isRetryable(failureType);
+        var status = failureType.name().equals("RATE_LIMITED") ? SyncRunStatus.RATE_LIMITED : SyncRunStatus.FAILED;
+        if (status == SyncRunStatus.RATE_LIMITED) {
+            syncRunService.completeRateLimited(syncRun, message);
+        } else {
+            syncRunService.completeFailed(syncRun, message);
+        }
+        SyncFailure failure = syncFailureService.recordFailure(
+            syncRun,
+            operation,
+            failureType,
+            retryable,
+            syncFailureClassifier.nextRetryAt(exception),
+            message
+        );
+        syncStateService.recordFailure(syncRun.getResourceType(), syncRun.getResourceKey(), message);
+        return new SyncOperationFailedException(
+            message,
+            syncRun.getId(),
+            failure.getId(),
+            status.name(),
+            retryable,
+            failure.getNextRetryAt(),
+            exception
+        );
     }
 }

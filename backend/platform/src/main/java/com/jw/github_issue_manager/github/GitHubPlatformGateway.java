@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 import com.jw.github_issue_manager.core.platform.PlatformGateway;
+import com.jw.github_issue_manager.core.platform.PlatformResult;
 import com.jw.github_issue_manager.core.platform.PlatformType;
 import com.jw.github_issue_manager.core.remote.RemoteComment;
 import com.jw.github_issue_manager.core.remote.RemoteIssue;
@@ -46,10 +47,45 @@ public class GitHubPlatformGateway implements PlatformGateway {
     }
 
     @Override
+    public PlatformResult<List<RemoteRepository>> getAccessibleRepositoriesWithRateLimit(String accessToken, String baseUrl) {
+        GitHubApiResult<List<GitHubRepositoryInfo>> result = gitHubApiClient.getAccessibleRepositoriesWithRateLimit(accessToken);
+        List<RemoteRepository> repositories = result.data().stream()
+            .map(this::toRemoteRepository)
+            .toList();
+        return new PlatformResult<>(repositories, result.rateLimitSnapshot());
+    }
+
+    @Override
     public List<RemoteIssue> getRepositoryIssues(String accessToken, String baseUrl, String ownerKey, String repositoryName) {
         return gitHubApiClient.getRepositoryIssues(accessToken, ownerKey, repositoryName).stream()
             .map(this::toRemoteIssue)
             .toList();
+    }
+
+    @Override
+    public PlatformResult<List<RemoteIssue>> getRepositoryIssuesWithRateLimit(String accessToken, String baseUrl, String ownerKey, String repositoryName) {
+        GitHubApiResult<List<GitHubIssueInfo>> result = gitHubApiClient.getRepositoryIssuesWithRateLimit(accessToken, ownerKey, repositoryName);
+        List<RemoteIssue> issues = result.data().stream()
+            .map(this::toRemoteIssue)
+            .toList();
+        return new PlatformResult<>(issues, result.rateLimitSnapshot());
+    }
+
+    @Override
+    public PlatformResult<RemoteIssue> getRepositoryIssueWithRateLimit(
+        String accessToken,
+        String baseUrl,
+        String ownerKey,
+        String repositoryName,
+        String issueKey
+    ) {
+        GitHubApiResult<GitHubIssueInfo> result = gitHubApiClient.getRepositoryIssueWithRateLimit(
+            accessToken,
+            ownerKey,
+            repositoryName,
+            Integer.parseInt(issueKey)
+        );
+        return new PlatformResult<>(toRemoteIssue(result.data()), result.rateLimitSnapshot());
     }
 
     @Override

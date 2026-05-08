@@ -19,6 +19,11 @@ public class SyncStateService {
         return upsert(resourceType, resourceKey, SyncStatus.SUCCESS, message);
     }
 
+    @Transactional
+    public SyncState recordFailure(SyncResourceType resourceType, String resourceKey, String message) {
+        return upsert(resourceType, resourceKey, SyncStatus.FAILED, message);
+    }
+
     @Transactional(readOnly = true)
     public SyncStateResponse getSyncState(SyncResourceType resourceType, String resourceKey) {
         return syncStateRepository.findByResourceTypeAndResourceKey(resourceType, resourceKey)

@@ -8,7 +8,30 @@ public interface GitHubApiClient {
 
     List<GitHubRepositoryInfo> getAccessibleRepositories(String personalAccessToken);
 
+    default GitHubApiResult<List<GitHubRepositoryInfo>> getAccessibleRepositoriesWithRateLimit(String personalAccessToken) {
+        return new GitHubApiResult<>(getAccessibleRepositories(personalAccessToken), null);
+    }
+
     List<GitHubIssueInfo> getRepositoryIssues(String personalAccessToken, String owner, String repositoryName);
+
+    default GitHubApiResult<List<GitHubIssueInfo>> getRepositoryIssuesWithRateLimit(String personalAccessToken, String owner, String repositoryName) {
+        return new GitHubApiResult<>(getRepositoryIssues(personalAccessToken, owner, repositoryName), null);
+    }
+
+    default GitHubApiResult<GitHubIssueInfo> getRepositoryIssueWithRateLimit(
+        String personalAccessToken,
+        String owner,
+        String repositoryName,
+        int issueNumber
+    ) {
+        return new GitHubApiResult<>(
+            getRepositoryIssues(personalAccessToken, owner, repositoryName).stream()
+                .filter(issue -> issue.number() == issueNumber)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("GitHub issue not found: " + issueNumber)),
+            null
+        );
+    }
 
     GitHubIssueInfo createIssue(String personalAccessToken, String owner, String repositoryName, String title, String body);
 
