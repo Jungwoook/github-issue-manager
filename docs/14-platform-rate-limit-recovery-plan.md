@@ -193,31 +193,21 @@
 
 ## API 초안
 
-### GET `/api/platforms/{platform}/rate-limit`
+OpenAPI YAML 파일은 Swagger Editor에서 확인할 수 있도록 별도 문서로 분리한다.
 
-- 현재 플랫폼 연결 기준 rate limit 상태 조회
-- 응답: 최근 `RateLimitSnapshot`
+- [Rate Limit / Recovery API OpenAPI](./openapi/rate-limit-recovery-api.yaml)
 
-### GET `/api/sync-runs`
+아래 목록은 총괄 문서에서 빠르게 훑어보기 위한 요약이다.
 
-- 동기화 실행 이력 조회
-- 쿼리: `platform`, `resourceType`, `status`, `from`, `to`
-
-### GET `/api/sync-runs/{syncRunId}`
-
-- 동기화 실행 상세 조회
-- 실패 목록과 처리 건수 포함
-
-### GET `/api/sync-failures`
-
-- 재처리 대상 실패 목록 조회
-- 쿼리: `platform`, `retryable`, `resolved`, `resourceType`
-- 응답: `failureId`, `syncRunId`, 실패 유형, 재처리 가능 여부, `nextRetryAt`, 메시지 포함
-
-### POST `/api/sync-failures/{failureId}/retry`
-
-- 단일 실패 재처리
-- 응답: 새 `SyncRun` 결과
+| Method | Path | 설명 | 주요 파라미터 | 응답 |
+| --- | --- | --- | --- | --- |
+| <span style="color:#0969da"><strong>GET</strong></span> | `/api/platforms/{platform}/rate-limit` | 현재 플랫폼 연결 기준 최신 rate limit 상태 조회 | Path: `platform` | 최근 `RateLimitSnapshot`, 없으면 `204 No Content` |
+| <span style="color:#0969da"><strong>GET</strong></span> | `/api/sync-runs` | 최근 동기화 실행 이력 조회 | Query: `platform`, `resourceType`, `status`, `from`, `to` | `SyncRun` 목록 |
+| <span style="color:#0969da"><strong>GET</strong></span> | `/api/sync-runs/{syncRunId}` | 단일 동기화 실행 상세 조회 | Path: `syncRunId` | `SyncRun` 상세, 처리 건수, 실패 메시지 |
+| <span style="color:#0969da"><strong>GET</strong></span> | `/api/sync-failures` | 해결되지 않은 실패와 재처리 가능 여부 조회 | Query: `platform`, `retryable`, `resolved`, `resourceType` | `SyncFailure` 목록 |
+| <span style="color:#1a7f37"><strong>POST</strong></span> | `/api/sync-failures/{failureId}/retry` | 재처리 가능한 실패를 선택해 다시 실행 | Path: `failureId` | 새 `SyncRun` 결과 |
+| <span style="color:#1a7f37"><strong>POST</strong></span> | `/api/platforms/{platform}/repositories/{repositoryId}/resync` | 특정 저장소 범위의 cache를 원격 상태와 다시 맞춤 | Path: `platform`, `repositoryId`; Query: `scope` | 새 `SyncRun` 결과 |
+| <span style="color:#1a7f37"><strong>POST</strong></span> | `/api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}/resync` | 특정 이슈와 필요 시 댓글 cache를 원격 상태와 다시 맞춤 | Path: `platform`, `repositoryId`, `issueNumberOrKey`; Query: `includeComments` | 새 `SyncRun` 결과 |
 
 ### refresh/resync 실패 응답
 
@@ -231,16 +221,6 @@
   - `retryable`
   - `nextRetryAt`
 - 비고: 1차 구현에서는 이 응답이 사용자 안내의 기준이며 별도 알림 발송은 제외한다.
-
-### POST `/api/platforms/{platform}/repositories/{repositoryId}/resync`
-
-- 저장소 단위 수동 재동기화
-- 요청 옵션: `scope=REPOSITORY|ISSUES|COMMENTS|ALL`
-
-### POST `/api/platforms/{platform}/repositories/{repositoryId}/issues/{issueNumberOrKey}/resync`
-
-- 이슈 단위 수동 재동기화
-- 요청 옵션: `includeComments`
 
 ## 유즈케이스
 
