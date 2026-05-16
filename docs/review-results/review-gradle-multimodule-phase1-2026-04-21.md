@@ -1,6 +1,6 @@
 # Code Review: Gradle 멀티 모듈 1차 전환
 날짜: 2026-04-21
-참조: docs/review/gradle-multimodule-phase1-review.md
+참조: docs/reviews/gradle-multimodule-phase1-review.md
 
 ---
 
