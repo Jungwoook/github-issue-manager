@@ -1,6 +1,6 @@
 # Code Review: Platform 구조 문서화 (docs 15, 16)
 날짜: 2026-04-28
-참조: docs/review/platform-docs-15-16-review.md
+참조: docs/reviews/platform-docs-15-16-review.md
 
 ---
 

@@ -48,7 +48,7 @@
 "필요할 때만 참고"
 - `docs/13-platform-modularization-design.md`
   - 이번 1차 전환이 문서의 단계와 일치하는지 확인
-- `docs/task/260421.md`
+- `docs/tasks/260421.md`
   - 작업 기록과 실제 변경 범위 일치 여부 확인
 - `backend/README.md`
   - 사용자 실행 명령 변경 확인

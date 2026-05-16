@@ -137,7 +137,4 @@ sequenceDiagram
 
 ## 관련 문서
 
-- [14. 플랫폼별 API Rate Limit 관리 + 장애 복구 시스템 설계 계획](./14-platform-rate-limit-recovery-plan.md)
-- [14-1 SyncRun 실행 이력 설계](./14-1-sync-run-state-flow.md)
-- [14-3 실패 기록과 재처리 설계](./14-3-sync-failure-retry-design.md)
-
+- [14. 플랫폼별 API Rate Limit 관리 + 장애 복구 시스템 설계 계획](../14-platform-rate-limit-recovery-plan.md)

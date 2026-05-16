@@ -42,6 +42,19 @@
 - OAuth 기반 인증 전환
 - 다중 사용자 조직 권한 모델 고도화
 
+## 하위 문서
+
+이 문서는 rate limit 복구 설계의 총괄 문서로 유지한다. 세부 설명은 `docs/guides/`의 하위 문서에서 독립적으로 확인한다.
+
+| 문서 | 설명 |
+| --- | --- |
+| [14-1 SyncRun 실행 이력 설계](./guides/14-1-sync-run-state-flow.md) | 마지막 상태와 실행 이력을 분리하는 기준 |
+| [14-2 플랫폼 Rate Limit 설계](./guides/14-2-platform-rate-limit-design.md) | 플랫폼 호출 제한 정보를 공통 모델로 다루는 방식 |
+| [14-3 실패 기록과 재처리 설계](./guides/14-3-sync-failure-retry-design.md) | 실패 단위 저장과 재처리 판단 기준 |
+| [14-4 수동 재동기화 설계](./guides/14-4-manual-resync-design.md) | 저장소/이슈 단위 cache 보정 흐름 |
+| [14-5 복구 API 설계](./guides/14-5-recovery-api-design.md) | 복구 조회, retry, resync API 설계 방향 |
+| [14-6 Rate Limit 복구 검증 계획](./guides/14-6-rate-limit-recovery-test-plan.md) | 기존 흐름 유지와 복구 흐름 검증 기준 |
+
 ## 주요 개념
 
 ### RateLimitSnapshot

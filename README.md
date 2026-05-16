@@ -175,7 +175,7 @@ npm run build
 
 ## 9. 문서
 
-현재 루트 문서는 최종 설명용이고, 과거 설계 초안은 `docs/archive/`에 보관한다. 학습용 리뷰 문서와 작업 기록은 `docs/review`, `docs/claude`, `docs/task`에 유지한다.
+현재 루트 문서는 최종 설명용이고, 과거 설계 초안은 `docs/archive/`에 보관한다. 학습용 리뷰 문서는 `docs/reviews`, 리뷰 결과물은 `docs/review-results`, 작업 기록은 `docs/tasks`에 유지한다.
 
 | 문서 | 내용 |
 | --- | --- |
